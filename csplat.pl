@@ -454,8 +454,7 @@ sub fetch_ttyrecs {
 
   # If the game was in the hazy date range when Crawl was between
   # UTC and local time, skip.
-  return if ($end ge $CAO_BEFORE && $end le $CAO_AFTER) ||
-    ($start ge $CAO_BEFORE && $start le $CAO_AFTER);
+  return if ($end ge $CAO_BEFORE && $end le $CAO_AFTER);
 
   my @ttyrecs = find_ttyrecs($g) or return;
   @ttyrecs = grep(ttyrec_between($_, $start, $end), @ttyrecs);
