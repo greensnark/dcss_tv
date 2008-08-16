@@ -55,7 +55,7 @@ my $TTYRMINSZ = 250 * 1024;
 my $TTYRMAXSZ = 10 * 1024 * 1024;
 
 # Default ttyrec length.
-my $TTYRDEFSZ = 600 * 1024;
+my $TTYRDEFSZ = 350 * 1024;
 
 my $MINPLAYLIST = 15;
 
