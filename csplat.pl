@@ -533,7 +533,7 @@ sub trawl_games {
 
 my $SERVER      = '213.184.131.118'; # termcast server (probably don't change)
 my $PORT        = 31337;             # termcast port (probably don't change)
-my $NAME        = 'CSPLAT';          # name to use on termcast
+my $NAME        = 'C_SPLAT';         # name to use on termcast
 my $thres       = 3;                 # maximum sleep secs on a ttyrec frame
 my %PLAYED_GAMES;                    # hash tracking db ids of ttyrecs played
 my @TVGAMES;
