@@ -534,7 +534,6 @@ sub trawl_games {
 my $SERVER      = '213.184.131.118'; # termcast server (probably don't change)
 my $PORT        = 31337;             # termcast port (probably don't change)
 my $NAME        = 'CSPLAT';          # name to use on termcast
-my $PASS        = 'd&8iMn3dhg^%';    # pass to use on termcast
 my $thres       = 3;                 # maximum sleep secs on a ttyrec frame
 my %PLAYED_GAMES;                    # hash tracking db ids of ttyrecs played
 my @TVGAMES;
@@ -542,14 +541,15 @@ my $SOCK;
 my $WATCHERS = 0;
 my $MOST_WATCHERS = 0;
 
-my $LOGFILE = 'tv.log';
+my $PWFILE = 'tv.pwd';
 
-sub open_log_handles {
-  close STDOUT;
-  close STDIN;
-  close STDERR;
-  open STDOUT, '>', $LOGFILE;
+sub read_password {
+  chomp(my $text = do { local @ARGV = $PWFILE; <> });
+  die "No password for termcast login?\n" unless $text;
+  $text
 }
+
+my $PASS = read_password();   # pass to use on termcast
 
 sub scan_ttyrec_list {
   my $query = "SELECT id, logrecord, ttyrecs FROM ttyrec";
