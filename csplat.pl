@@ -681,6 +681,12 @@ sub check_watchers {
   }
 }
 
+sub tv_frame_filter {
+  my ($rdat, $rts, $rpts) = @_;
+  # Strip IBM graphics, kthx.
+  $$rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
+}
+
 sub tv_play_ttyrec {
   my ($g, $ttyrec, $skip) = @_;
   my $ttyfile = ttyrec_path($ttyrec);
@@ -700,7 +706,8 @@ sub tv_play_ttyrec {
   print "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
-                                  time_threshold => 3);
+                                  time_threshold => 3,
+                                  frame_filter => \&tv_frame_filter);
   while (my $fref = $t->next_frame()) {
     if ($skipsize) {
       next if tell($t->filehandle()) < $skipsize;
