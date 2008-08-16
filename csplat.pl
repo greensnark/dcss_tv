@@ -619,7 +619,7 @@ sub say_now_playing {
     print $SOCK "That was \e[1;33m$prev.\e[0m\e[2;0H" if $prev;
   }
   print $SOCK "Now playing \e[1;33m$this\e[0m.";
-  sleep($prev? 1 : 5);
+  sleep($prev? 3 : 5);
 }
 
 # Reconnect (or connect) to the termcast server and do the handshake.
