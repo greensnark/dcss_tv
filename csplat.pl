@@ -675,7 +675,10 @@ sub tv_play {
 
   my $sz = $g->{sz};
   for my $ttyrec (split / /, $g->{ttyrecs}) {
-    tv_play_ttyrec($g, $ttyrec, $sz && $sz > $TTYRDEFSZ ? -1 : 0);
+    eval {
+      tv_play_ttyrec($g, $ttyrec, $sz && $sz > $TTYRDEFSZ ? -1 : 0);
+    };
+    warn "$@\n" if $@;
     undef $sz;
   }
 }
