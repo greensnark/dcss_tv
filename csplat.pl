@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use IO::Handle;
 use IO::Socket::INET;
 use Term::TtyRec::Plus;
 use File::Path;
@@ -37,7 +38,7 @@ my @LOG_URLS = ('http://crawl.akrasiac.org/allgames.txt',
 my $TRAIL_DB = 'data/splat.db';
 my @LOG_FILES = map { m{.*/(.*)} } @LOG_URLS;
 
-my @IPLACES = qw/Tomb Hell Dis Tar Geh Coc Vault Crypt Zot Pan/;
+my @IPLACES = qw/Tomb Dis Tar Geh Coc Vault Crypt Zot Pan/;
 
 my $CAO_UTC_EPOCH = ParseDate("2008-08-07 03:30 UTC");
 my $CAO_BEFORE = DateCalc($CAO_UTC_EPOCH, "-2 days");
@@ -47,30 +48,54 @@ my %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
                              ttypath => 'http://crawl.akrasiac.org/rawdata' });
 
-my $DBH;
+# Smallest cumulative length of ttyrec that's acceptable.
+my $TTYRMINSZ = 250 * 1024;
 
-main();
+# Largest cumulative length of ttyrec.
+my $TTYRMAXSZ = 10 * 1024 * 1024;
+
+# Default ttyrec length.
+my $TTYRDEFSZ = 600 * 1024;
+
+my $MINPLAYLIST = 15;
+
+# Approximate compression of a ttyrec.bzip2
+my $BZ2X = 11;
+
+my $NOTTYP = 1;
+
+my $DBH;
 
 sub main {
   check_dirs();
-  init_db();
+  open_db();
   fetch_logs(@LOG_URLS);
-  trawl_games();
+  while (1) {
+    trawl_games();
+    sleep 600;
+  }
 }
 
 sub check_dirs {
   mkpath( [ $DATA_DIR, $TTYREC_DIR ] );
 }
 
-sub init_db {
-  $DBH = open_db();
-}
-
 sub open_db {
   my $size = -s $TRAIL_DB;
-  my $dbh = DBI->connect("dbi:SQLite:$TRAIL_DB");
-  create_tables($dbh) unless defined($size) && $size > 0;
-  $dbh
+  $DBH = DBI->connect("dbi:SQLite:$TRAIL_DB");
+  create_tables($DBH) unless defined($size) && $size > 0;
+}
+
+sub close_db {
+  if ($DBH) {
+    $DBH->disconnect();
+    undef $DBH;
+  }
+}
+
+sub reopen_db {
+  close_db();
+  open_db();
 }
 
 sub create_tables {
@@ -113,13 +138,14 @@ sub log_path {
 }
 
 sub ttyrec_path {
-  $TTYREC_DIR . "/" . url_file(shift)
+  my $url = shift;
+  $TTYREC_DIR . "/" . url_file($url)
 }
 
 sub fetch_url {
   my ($url, $file) = @_;
   $file ||= url_file($url);
-  my $command = "wget -c -O $file $url";
+  my $command = "wget -q -c -O $file $url";
   my $status = system $command;
   die "Error fetching $url: $?\n" if $status;
 }
@@ -224,6 +250,16 @@ sub record_log_place {
 
 sub start_ttyplay {
   print "Forking tty player.";
+  undef $NOTTYP;
+
+  my $pid = fork;
+  die "Couldn't fork tv!\n" unless defined $pid;
+
+  # Parent returns here.
+  return if $pid != 0;
+
+  # The child runs tv forever.
+  run_tv();
 }
 
 sub place_prefix {
@@ -233,10 +269,19 @@ sub place_prefix {
   $place
 }
 
+sub place_depth {
+  my $place = shift;
+  my ($depth) = $place =~ /:(\d+)/;
+  $depth || 1
+}
+
 sub is_interesting_place {
   # We're interested in Zot, Hells, Vaults, Tomb.
   my ($place, $xl) = @_;
   my $prefix = place_prefix($place);
+  my $depth = place_depth($place);
+  return 1 if $prefix eq 'Elf' && $depth >= 6;
+  return 1 if $prefix eq 'Slime' && $depth >= 5;
   return if $prefix eq 'Vault' && $xl < 24;
   ($place =~ "Abyss" && $xl > 20)
     || grep($prefix eq $_, @IPLACES)
@@ -245,15 +290,14 @@ sub is_interesting_place {
 sub interesting_game {
   my $g = shift;
 
-  return if $g->{ktyp} eq 'quitting';
+  my $ktyp = $g->{ktyp};
+  return if grep($ktyp eq $_, qw/quitting leaving winning/);
 
   my $xl = $g->{xl};
   my $place = $g->{place};
 
-  my $good = is_interesting_place($place, $xl) && $xl > 10;
-
+  my $good = $xl >= 25 || (is_interesting_place($place, $xl) && $xl > 10);
   print desc_game($g), " looks interesting!\n" if $good;
-
   $good
 }
 
@@ -337,15 +381,52 @@ sub desc_game {
   my $when = " on " . fix_crawl_time($g->{end});
 
   "$g->{name} the $g->{title} ($g->{xl} $g->{char})$god, $dmsg$place$when, " .
-    "after $g->{turn} turns."
+    "after $g->{turn} turns"
+}
+
+sub desc_game_brief {
+  my $g = shift;
+  my $desc = desc_game($g);
+  $desc =~ s/,.*//;
+  $desc
 }
 
 sub download_ttyrecs {
   my $g = shift;
-  print "Downloading ttyrecs for ", desc_game($g), "\n";
-  for my $url (split / /, $g->{ttyrecs}) {
-    fetch_url($url, ttyrec_path($url));
+
+  my $sz = 0;
+
+  my @ttyrs = reverse @{$g->{ttyrecurls}};
+
+  my @tofetch;
+  for my $tty (@ttyrs) {
+    last if $sz >= $TTYRDEFSZ;
+    my $ttysz = $tty->{sz};
+    # Fudge size if the ttyrec is compressed.
+    $ttysz *= $BZ2X if $tty->{u} =~ /bz2$/;
+    $sz += $ttysz;
+
+    push @tofetch, $tty;
   }
+
+  if ($sz > $TTYRMAXSZ || $sz < $TTYRMINSZ) {
+    print "ttyrec total size for " . desc_game($g) .
+      " = $sz is out of bounds.\n";
+    return;
+  }
+
+  @tofetch = reverse(@tofetch);
+  print "Downloading ", scalar(@tofetch), " ttyrecs for ", desc_game($g), "\n";
+  for my $url (@tofetch) {
+    my $path = ttyrec_path($url->{u});
+    fetch_url($url->{u}, ttyrec_path($url->{u}));
+  }
+
+  $g->{sz} = $sz;
+  $g->{ttyrecs} = join(" ", map($_->{u}, @tofetch));
+  $g->{ttyrecurls} = \@tofetch;
+
+  1
 }
 
 sub fetch_ttyrecs {
@@ -367,14 +448,14 @@ sub fetch_ttyrecs {
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @ttyrecs));
   $g->{ttyrecurls} = \@ttyrecs;
-  download_ttyrecs($g);
-
-  1
+  download_ttyrecs($g)
 }
 
 sub clean_ttyrec_url {
-  my $url = shift;
+  my ($baseurl, $url) = @_;
   $url->{u} =~ s{^./}{};
+  $baseurl = "$baseurl/" unless $baseurl =~ m{/$};
+  $url->{u} = $baseurl . $url->{u};
   $url
 }
 
@@ -395,14 +476,15 @@ sub fetch_ttyrec_urls_from_server {
   my ($name, $userpath) = @_;
   print "Fetching ttyrec listing for $name\n";
   my $listing = get($userpath) or return ();
-  my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*([\d.]+[kM])\b/gi;
+  my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
   my @urls;
   for (my $i = 0; $i < @urlsizes; $i += 2) {
     my $url = $urlsizes[$i];
     my $size = human_readable_size($urlsizes[$i + 1]);
     push @urls, { u => $url, sz => $size };
   }
-  my @ttyrecs = map(clean_ttyrec_url($_), grep($_->{u} =~ /\.ttyrec/, @urls));
+  my @ttyrecs = map(clean_ttyrec_url($userpath, $_),
+                    grep($_->{u} =~ /\.ttyrec/, @urls));
   @ttyrecs
 }
 
@@ -419,6 +501,8 @@ sub trawl_games {
   my $lines = 0;
   my $games = 0;
   my $existing_games = count_existing_games();
+  start_ttyplay() if $existing_games >= $MINPLAYLIST;
+
   for my $log (@LOG_URLS) {
     # Go to last point that we processed.
     my $fh = seek_log($log);
@@ -427,19 +511,217 @@ sub trawl_games {
       if (interesting_game($game) && fetch_ttyrecs($game)) {
         $games++;
         record_game($game);
+
+        if ($NOTTYP && $games + $existing_games >= $MINPLAYLIST) {
+          start_ttyplay();
+        }
       }
       record_log_place($log, $game);
 
       if (!(++$lines % 100)) {
-        print "Scanned $lines lines, found $games interesting games\n";
+        my $total = $games + $existing_games;
+        print "Scanned $lines lines, found $total interesting games\n";
         $DBH->commit;
         $DBH->begin_work;
-      }
-
-      if ($games + $existing_games > 3) {
-        start_ttyplay();
       }
     }
     $DBH->commit;
   }
+}
+
+############################  TV!  ####################################
+
+my $SERVER      = '213.184.131.118'; # termcast server (probably don't change)
+my $PORT        = 31337;             # termcast port (probably don't change)
+my $NAME        = 'CSPLAT';          # name to use on termcast
+my $PASS        = 'd&8iMn3dhg^%';    # pass to use on termcast
+my $thres       = 3;                 # maximum sleep secs on a ttyrec frame
+my %PLAYED_GAMES;                    # hash tracking db ids of ttyrecs played
+my @TVGAMES;
+my $SOCK;
+my $WATCHERS = 0;
+my $MOST_WATCHERS = 0;
+
+my $LOGFILE = 'tv.log';
+
+sub open_log_handles {
+  close STDOUT;
+  close STDIN;
+  close STDERR;
+  open STDOUT, '>', $LOGFILE;
+}
+
+sub scan_ttyrec_list {
+  my $query = "SELECT id, logrecord, ttyrecs FROM ttyrec";
+  my $rows =
+    check_exec(
+      $query,
+      sub { $DBH->selectall_arrayref($query) } );
+
+  @TVGAMES = ();
+  for my $row (@$rows) {
+    my $id = $row->[0];
+    my $g = xlog_line($row->[1]);
+    $g->{ttyrecs} = $row->[2];
+    $g->{id} = $id;
+    push @TVGAMES, $g;
+  }
+  die "No games to play!\n" unless @TVGAMES;
+  @TVGAMES = grep(!$PLAYED_GAMES{$_->{id}}, @TVGAMES);
+}
+
+sub pick_random_unplayed {
+  unless (@TVGAMES) {
+    %PLAYED_GAMES = ();
+    scan_ttyrec_list();
+  }
+  my $game = $TVGAMES[int(rand(@TVGAMES))];
+  $PLAYED_GAMES{$game->{id}} = 1;
+  $game
+}
+
+sub run_tv {
+  reopen_db();
+  my $old;
+  while (1) {
+    # Check for new ttyrecs in the DB.
+    scan_ttyrec_list();
+    my $g = pick_random_unplayed();
+    say_now_playing($g, $old);
+    $old = $g;
+    tv_play($g);
+  }
+}
+
+sub say_now_playing {
+  my ($this, $prev) = @_;
+  $this = desc_game_brief($this);
+  server_connect();
+  if ($prev) {
+    $prev = desc_game_brief($prev);
+    print $SOCK "\e[2J\e[H";
+    print $SOCK "That was \e[1;33m$prev.\e[0m\e[2;0H" if $prev;
+  }
+  print $SOCK "Now playing \e[1;33m$this\e[0m.";
+  sleep 5;
+}
+
+# Reconnect (or connect) to the termcast server and do the handshake.
+# Returns () if an error occurred (such as not being able to connect)
+# Otherwise returns the socket, which is ready to accept ttyrec frame data.
+sub server_reconnect {
+  my ($server, $port, $name, $pass) = @_;
+
+  return if defined $SOCK;
+
+  print "Attempting to connect...\n";
+
+  $SOCK = IO::Socket::INET->new(PeerAddr => "$server:$port",
+                                Proto    => 'tcp',
+                                Type => SOCK_STREAM);
+  die "Unable to connect: $!\n" unless defined $SOCK;
+  return unless defined($SOCK);
+
+  print "Trying to send handshake...\n";
+  # Try to send the handshake
+  print $SOCK "hello $name $pass\n";
+
+  my $response = <$SOCK>;
+  die "Bad response from server: $response ($!)\n"
+    unless $response and $response =~ /^hello, $name\s*$/;
+
+  print "Connected!\n";
+
+  $SOCK
+}
+
+sub server_connect {
+#   if (1) {
+#     $SOCK = \*STDOUT;
+#     $SOCK->autoflush;
+#     return $SOCK;
+#   }
+  while (!defined($SOCK)) {
+    server_reconnect($SERVER, $PORT, $NAME, $PASS);
+    last if defined $SOCK;
+    print "Unable to connect, trying again in 10s...\n";
+    sleep 10;
+  }
+}
+
+sub tv_play {
+  my $g = shift;
+
+  my $sz = $g->{sz};
+  for my $ttyrec (split / /, $g->{ttyrecs}) {
+    tv_play_ttyrec($g, $ttyrec, $sz && $sz > $TTYRDEFSZ);
+  }
+}
+
+sub check_watchers {
+  my $sock_out = <$SOCK>;
+  if (defined($sock_out)) {
+    chomp $sock_out;
+    if ($sock_out eq 'msg watcher connected') {
+      ++$WATCHERS;
+      print "New watcher! Up to $WATCHERS.";
+      if ($WATCHERS > $MOST_WATCHERS) {
+        $MOST_WATCHERS = $WATCHERS;
+        print " That's a new record since this session has started!";
+      }
+      print "\n";
+    }
+    elsif ($sock_out eq 'msg watcher disconnected') {
+      --$WATCHERS;
+      print "Lost a watcher. Down to $WATCHERS.\n";
+    }
+    else { # Don't know how to handle it, so just echo
+      print ">> $sock_out\n";
+    }
+  }
+}
+
+sub tv_play_ttyrec {
+  my ($g, $ttyrec, $skip) = @_;
+  my $ttyfile = ttyrec_path($ttyrec);
+  server_connect();
+  #check_watchers();
+
+  my $size = -s $ttyfile;
+  my $skipsize = 0;
+
+  if ($skip) {
+    $size *= $BZ2X if $ttyfile =~ /.bz2$/;
+    if ($size > $TTYRDEFSZ * 1.5) {
+      $skipsize = $size - int($TTYRDEFSZ * 1.5);
+    }
+  }
+
+  print "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
+
+  my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
+                                  time_threshold => 3);
+  while (my $fref = $t->next_frame()) {
+    if ($skipsize) {
+      next if tell($t->filehandle()) < $skipsize;
+      if (index($fref->{data}, "\033[2J") > -1) {
+        undef $skipsize;
+        print "Done skip, starting normal playback\n";
+      } else {
+        next;
+      }
+    }
+    select undef, undef, undef, $fref->{diff};
+    print $SOCK $fref->{data};
+  }
+  close($t->filehandle());
+}
+
+#######################################################################
+
+if (grep /-tv/, @ARGV) {
+  run_tv();
+}
+else {
+  main();
 }

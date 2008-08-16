@@ -1,0 +1,4 @@
+#! /bin/bash
+
+rm data/splat.db
+rm -rf data/ttyrecs
