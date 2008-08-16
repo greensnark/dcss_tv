@@ -55,7 +55,7 @@ my $TTYRMAXSZ = 20 * 1024 * 1024;
 # Default ttyrec length.
 my $TTYRDEFSZ = 100 * 1024;
 
-my $MINPLAYLIST = 2;
+my $MINPLAYLIST = 15;
 
 # Approximate compression of a ttyrec.bzip2
 my $BZ2X = 11;
@@ -425,7 +425,7 @@ sub download_ttyrecs {
     my $path = ttyrec_path($url->{u});
     fetch_url($url->{u}, ttyrec_path($url->{u}));
     if ($url->{u} =~ /.bz2/) {
-      system "bunzip2 " . ttyrec_path($url->{u})
+      system "bunzip2 -f " . ttyrec_path($url->{u})
         and die "Couldn't bunzip $url->{u}\n";
       $url->{u} =~ s/\.bz2$//;
     }
