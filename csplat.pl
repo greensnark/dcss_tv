@@ -26,8 +26,8 @@ memoize('fetch_ttyrec_urls_from_server');
 #
 # Todo:
 # * Set a combined size limit for ttyrecs per game (2M?)
-# * Download ttyrecs and check each one to make sure it's 80x24.
 # * Stream for fun and profit!
+# * Reset ttyrec listing cache once we hit the end of the logs.
 
 my $DATA_DIR = 'data';
 my $TTYREC_DIR = "$DATA_DIR/ttyrecs";
@@ -55,7 +55,7 @@ my $TTYRMINSZ = 250 * 1024;
 my $TTYRMAXSZ = 10 * 1024 * 1024;
 
 # Default ttyrec length.
-my $TTYRDEFSZ = 350 * 1024;
+my $TTYRDEFSZ = 250 * 1024;
 
 my $MINPLAYLIST = 15;
 
