@@ -8,11 +8,9 @@ use Term::TtyRec::Plus;
 use File::Path;
 use Date::Manip;
 use DBI;
-use Memoize;
 use LWP::Simple;
+use Carp;
 use Fcntl qw/SEEK_SET/;
-
-memoize('fetch_ttyrec_urls_from_server');
 
 # Overall strategy:
 # * Fetch logfiles.
@@ -49,20 +47,22 @@ my %SERVMAP =
                              ttypath => 'http://crawl.akrasiac.org/rawdata' });
 
 # Smallest cumulative length of ttyrec that's acceptable.
-my $TTYRMINSZ = 250 * 1024;
+my $TTYRMINSZ = 60 * 1024;
 
 # Largest cumulative length of ttyrec.
-my $TTYRMAXSZ = 10 * 1024 * 1024;
+my $TTYRMAXSZ = 20 * 1024 * 1024;
 
 # Default ttyrec length.
-my $TTYRDEFSZ = 250 * 1024;
+my $TTYRDEFSZ = 100 * 1024;
 
-my $MINPLAYLIST = 15;
+my $MINPLAYLIST = 2;
 
 # Approximate compression of a ttyrec.bzip2
 my $BZ2X = 11;
 
 my $NOTTYP = 1;
+
+my %CACHED_TTYREC_URLS;
 
 my $DBH;
 
@@ -73,6 +73,7 @@ sub main {
   while (1) {
     trawl_games();
     sleep 600;
+    %CACHED_TTYREC_URLS = ();
   }
 }
 
@@ -212,14 +213,19 @@ sub xlog_line {
   \%hash
 }
 
+sub escape_xlogfield {
+  my $field = shift;
+  $field =~ s/:/::/;
+  $field
+}
+
 sub xlog_str {
   my $xlog = shift;
   my %hash = %$xlog;
-  delete $hash{src};
   delete $hash{offset};
   delete $hash{ttyrecs};
   delete $hash{ttyrecurls};
-  join(":", map { "$_=$hash{$_}" } keys(%hash))
+  join(":", map { "$_=@{[ escape_xlogfield($hash{$_}) ]}" } keys(%hash))
 }
 
 sub read_log {
@@ -280,10 +286,10 @@ sub is_interesting_place {
   my ($place, $xl) = @_;
   my $prefix = place_prefix($place);
   my $depth = place_depth($place);
-  return 1 if $prefix eq 'Elf' && $depth >= 6;
-  return 1 if $prefix eq 'Slime' && $depth >= 5;
+  return 1 if $prefix eq 'Elf' && $depth == 7;
+  return 1 if $prefix eq 'Slime' && $depth == 6;
   return if $prefix eq 'Vault' && $xl < 24;
-  ($place =~ "Abyss" && $xl > 20)
+  ($place =~ "Abyss" && $xl > 24)
     || grep($prefix eq $_, @IPLACES)
 }
 
@@ -309,6 +315,7 @@ sub game_server {
   my $g = shift;
   my $src = $g->{src};
   my ($server) = $src =~ m{^http://(.*?)/};
+  confess "No server in $src\n" unless $server;
   $server
 }
 
@@ -350,17 +357,16 @@ sub tty_time {
   $parsed
 }
 
-sub utc_time {
-  my $time = shift;
-  Date_ConvTZ($time, "", "UTC")
+sub ttyrec_file_time {
+  my $url = shift;
+  my ($date) = $url =~ /(\d{4}-\d{2}-\d{2}\.\d{2}:\d{2}:\d{2})/;
+  die "ttyrec url ($url) contains no date?\n" unless $date;
+  ParseDate("$date UTC")
 }
 
 sub ttyrec_between {
   my ($tty, $start, $end) = @_;
-  my $url = $tty->{u};
-  my ($date) = $url =~ /(\d{4}-\d{2}-\d{2}\.\d{2}:\d{2}:\d{2})/;
-  die "ttyrec url ($url) contains no date?\n" unless $date;
-  my $pdate = ParseDate("$date UTC");
+  my $pdate = ttyrec_file_time( $tty->{u} );
   $pdate ge $start && $pdate le $end
 }
 
@@ -385,10 +391,7 @@ sub desc_game {
 }
 
 sub desc_game_brief {
-  my $g = shift;
-  my $desc = desc_game($g);
-  $desc =~ s/,.*//;
-  $desc
+  desc_game(@_)
 }
 
 sub download_ttyrecs {
@@ -417,9 +420,16 @@ sub download_ttyrecs {
 
   @tofetch = reverse(@tofetch);
   print "Downloading ", scalar(@tofetch), " ttyrecs for ", desc_game($g), "\n";
+  $sz = 0;
   for my $url (@tofetch) {
     my $path = ttyrec_path($url->{u});
     fetch_url($url->{u}, ttyrec_path($url->{u}));
+    if ($url->{u} =~ /.bz2/) {
+      system "bunzip2 " . ttyrec_path($url->{u})
+        and die "Couldn't bunzip $url->{u}\n";
+      $url->{u} =~ s/\.bz2$//;
+    }
+    $sz += -s(ttyrec_path($url->{u}));
   }
 
   $g->{sz} = $sz;
@@ -474,6 +484,9 @@ sub human_readable_size {
 
 sub fetch_ttyrec_urls_from_server {
   my ($name, $userpath) = @_;
+
+  return @{$CACHED_TTYREC_URLS{$userpath}} if $CACHED_TTYREC_URLS{$userpath};
+
   print "Fetching ttyrec listing for $name\n";
   my $listing = get($userpath) or return ();
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
@@ -485,6 +498,8 @@ sub fetch_ttyrec_urls_from_server {
   }
   my @ttyrecs = map(clean_ttyrec_url($userpath, $_),
                     grep($_->{u} =~ /\.ttyrec/, @urls));
+
+  $CACHED_TTYREC_URLS{$userpath} = \@ttyrecs;
   @ttyrecs
 }
 
@@ -598,12 +613,13 @@ sub say_now_playing {
   $this = desc_game_brief($this);
   server_connect();
   if ($prev) {
+    sleep 5;
     $prev = desc_game_brief($prev);
     print $SOCK "\e[2J\e[H";
     print $SOCK "That was \e[1;33m$prev.\e[0m\e[2;0H" if $prev;
   }
   print $SOCK "Now playing \e[1;33m$this\e[0m.";
-  sleep 5;
+  sleep($prev? 1 : 5);
 }
 
 # Reconnect (or connect) to the termcast server and do the handshake.
@@ -654,7 +670,7 @@ sub tv_play {
 
   my $sz = $g->{sz};
   for my $ttyrec (split / /, $g->{ttyrecs}) {
-    tv_play_ttyrec($g, $ttyrec, $sz && $sz > $TTYRDEFSZ);
+    tv_play_ttyrec($g, $ttyrec, $sz && $sz > $TTYRDEFSZ ? -1 : 0);
     undef $sz;
   }
 }
@@ -688,6 +704,11 @@ sub tv_frame_filter {
   $$rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
 }
 
+sub delta_seconds {
+  my $delta = shift;
+  Delta_Format($delta, 0, "%sh")
+}
+
 sub tv_play_ttyrec {
   my ($g, $ttyrec, $skip) = @_;
   my $ttyfile = ttyrec_path($ttyrec);
@@ -698,10 +719,16 @@ sub tv_play_ttyrec {
   my $skipsize = 0;
 
   if ($skip) {
-    $size *= $BZ2X if $ttyfile =~ /.bz2$/;
-    if ($size > $TTYRDEFSZ * 1.5) {
-      $skipsize = $size - int($TTYRDEFSZ * 1.5);
+    if ($skip > 0) {
+      $skipsize = $skip;
     }
+    else {
+      $size *= $BZ2X if $ttyfile =~ /.bz2$/;
+      if ($size > $TTYRDEFSZ * 1.5) {
+        $skipsize = $size - int($TTYRDEFSZ * 1.5);
+      }
+    }
+    print "\nNeed to skip $skipsize of $size bytes\n" if $skipsize;
   }
 
   print "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
@@ -709,9 +736,18 @@ sub tv_play_ttyrec {
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
                                   time_threshold => 3,
                                   frame_filter => \&tv_frame_filter);
+  my $ttyrec_time = ttyrec_file_time($ttyfile);
+  my $end_time = tty_time($g, 'end');
+
+  my $delta = delta_seconds(DateCalc($ttyrec_time, $end_time));
+  my $fc = 0;
+  my $lastclear = 0;
   while (my $fref = $t->next_frame()) {
     if ($skipsize) {
-      next if tell($t->filehandle()) < $skipsize;
+      my $pos = tell($t->filehandle());
+      my $hasclear = index($fref->{data}, "\033[2J") > -1;
+      $lastclear = $pos if $hasclear;
+      next if $pos < $skipsize;
       if (index($fref->{data}, "\033[2J") > -1) {
         undef $skipsize;
         print "Done skip, starting normal playback\n";
@@ -721,8 +757,38 @@ sub tv_play_ttyrec {
     }
     select undef, undef, undef, $fref->{diff};
     print $SOCK $fref->{data};
+    #tv_show_overlay($delta - $fref->{relative_time}, $end_time, $g->{tmsg});
   }
+
   close($t->filehandle());
+
+  if ($skipsize) {
+    tv_play_ttyrec($g, $ttyrec, $lastclear);
+  }
+}
+
+my $OVY = 15;
+my $OVX = 40;
+
+sub format_seconds {
+  my $raw = shift;
+  my $s = int($raw) % 60;
+  $raw = int($raw / 60);
+  my $m = $raw % 60;
+  sprintf("%02d:%02d", $m, $s)
+}
+
+sub tv_overlay_text {
+  my ($delta, $end, $tmsg) = @_;
+  my $text = format_seconds($delta) . ": $tmsg";
+  $text = substr($text, 0, 39) if length($text) > 39;
+  $text
+}
+
+sub tv_show_overlay {
+  my ($delta, $end, $tmsg) = @_;
+  my $overlay_text = tv_overlay_text($delta, $end, $tmsg);
+  print $SOCK "\033[$OVY;${OVX}H$overlay_text\033[K";
 }
 
 #######################################################################
