@@ -31,6 +31,8 @@ use Fcntl qw/SEEK_SET/;
 my $DATA_DIR = 'data';
 my $TTYREC_DIR = "$DATA_DIR/ttyrecs";
 
+my $FETCH_ONLY = 0;
+
 my @LOG_URLS = ('http://crawl.akrasiac.org/allgames.txt',
                 'http://crawl.akrasiac.org/logfile04');
 
@@ -258,6 +260,8 @@ sub record_log_place {
 sub start_ttyplay {
   print "Forking tty player.";
   undef $NOTTYP;
+
+  return if $FETCH_ONLY;
 
   my $pid = fork;
   die "Couldn't fork tv!\n" unless defined $pid;
@@ -793,6 +797,8 @@ sub tv_show_overlay {
 }
 
 #######################################################################
+
+$FETCH_ONLY = grep /-fetch/, @ARGV;
 
 if (grep /-tv/, @ARGV) {
   run_tv();
