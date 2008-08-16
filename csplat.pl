@@ -1,5 +1,8 @@
 #! /usr/bin/perl
 
+# C-SPLAT by greensnark.
+# Based on TermCastTv 1.2 by Eidolos.
+
 use strict;
 use warnings;
 use IO::Handle;
@@ -17,15 +20,13 @@ use Fcntl qw/SEEK_SET/;
 # * Scan logfiles to pick games. Keep track of logfile offsets.
 # * For selected games, check server to see if we have ttyrecs.
 # * Grab ttyrecs and drop them in ttyrec directory.
-# * Spawn tv once we have three games' worth of ttyrec.
+# * Spawn tv once we have X games' worth of ttyrec.
 # * As we load more games, write them into ttyrec dir, update
 #   index card for ttyrecs (with game info).
-# * Strip unicode, ibm as we play.
+# * Strip ibm gfx as we play.
 #
 # Todo:
-# * Set a combined size limit for ttyrecs per game (2M?)
-# * Stream for fun and profit!
-# * Reset ttyrec listing cache once we hit the end of the logs.
+# * Overlay to show how much time left?
 
 my $DATA_DIR = 'data';
 my $TTYREC_DIR = "$DATA_DIR/ttyrecs";
