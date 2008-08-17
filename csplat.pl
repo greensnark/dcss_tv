@@ -35,7 +35,10 @@ my $TTYREC_DIR = "$DATA_DIR/ttyrecs";
 my $FETCH_ONLY = 0;
 
 my @LOG_URLS = ('http://crawl.akrasiac.org/allgames.txt',
-                'http://crawl.akrasiac.org/logfile04');
+                'http://crawl.akrasiac.org/logfile04',
+                'http://crawl.develz.org/allgames-old.txt',
+                'http://crawl.develz.org/allgames-rel.txt',
+                'http://crawl.develz.org/allgames-svn.txt');
 
 my $TRAIL_DB = 'data/splat.db';
 my @LOG_FILES = map { m{.*/(.*)} } @LOG_URLS;
@@ -48,7 +51,10 @@ my $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
 
 my %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
-                             ttypath => 'http://crawl.akrasiac.org/rawdata' });
+                             dsttz => 'EDT',
+                             ttypath => 'http://crawl.akrasiac.org/rawdata' },
+   'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
+                           ttypath => 'http://crawl.develz.org/ttyrecs' });
 
 # Smallest cumulative length of ttyrec that's acceptable.
 my $TTYRMINSZ = 60 * 1024;
@@ -59,8 +65,9 @@ my $TTYRMAXSZ = 20 * 1024 * 1024;
 # Default ttyrec length.
 my $TTYRDEFSZ = 130 * 1024;
 
-# Approximate compression of a ttyrec.bzip2
+# Approximate compression of ttyrecs
 my $BZ2X = 11;
+my $GZX = 6.6;
 
 my %FETCHED_GAMES;
 my %CACHED_TTYREC_URLS;
@@ -80,6 +87,7 @@ sub fetch {
   while (1) {
     fetch_logs(@LOG_URLS);
     trawl_games();
+    print "Sleeping between log scans...\n";
     sleep 600;
     %CACHED_TTYREC_URLS = ();
   }
@@ -376,6 +384,9 @@ sub interesting_game {
   my $ktyp = $g->{ktyp};
   return if grep($ktyp eq $_, qw/quitting leaving winning/);
 
+  # No matter how high level, ignore Temple deaths.
+  return if $g->{place} eq 'Temple';
+
   my $xl = $g->{xl};
   my $place = $g->{place};
 
@@ -420,9 +431,7 @@ sub tty_tz_time {
   my $dst = $time =~ /D$/;
   $time =~ s/[DS]$//;
 
-  my $tz = server_field($g, 'tz');
-  $tz =~ s/ST$/DT/ if $dst;
-
+  my $tz = server_field($g, $dst? 'dsttz' : 'tz');
   ParseDate("$time $tz")
 }
 
@@ -474,12 +483,34 @@ sub desc_game {
   $place = " $prep $place";
   my $when = " on " . fix_crawl_time($g->{end});
 
-  "$g->{name} the $g->{title} ($g->{xl} $g->{char})$god, $dmsg$place$when, " .
+  "$g->{name} the $g->{title} (L$g->{xl} $g->{char})$god, $dmsg$place$when, " .
     "after $g->{turn} turns"
 }
 
 sub desc_game_brief {
   desc_game(@_)
+}
+
+sub fudge_size {
+  my ($sz, $url) = @_;
+  # Fudge size if the ttyrec is compressed.
+  $sz *= $BZ2X if $url =~ /\.bz2$/;
+  $sz *= $GZX if $url =~ /\.gz$/;
+  $sz
+}
+
+sub uncompress_ttyrec {
+  my $url = shift;
+  if ($url->{u} =~ /.bz2$/) {
+    system "bunzip2 -f " . ttyrec_path($url->{u})
+      and die "Couldn't bunzip $url->{u}\n";
+    $url->{u} =~ s/\.bz2$//;
+  }
+  if ($url->{u} =~ /.gz$/) {
+    system "gunzip -f " . ttyrec_path($url->{u})
+      and die "Couldn't gunzip $url->{u}\n";
+    $url->{u} =~ s/\.gz$//;
+  }
 }
 
 sub download_ttyrecs {
@@ -492,9 +523,9 @@ sub download_ttyrecs {
   my @tofetch;
   for my $tty (@ttyrs) {
     last if $sz >= $TTYRDEFSZ;
+
     my $ttysz = $tty->{sz};
-    # Fudge size if the ttyrec is compressed.
-    $ttysz *= $BZ2X if $tty->{u} =~ /bz2$/;
+    $ttysz = fudge_size($ttysz, $tty->{u});
     $sz += $ttysz;
 
     push @tofetch, $tty;
@@ -512,11 +543,7 @@ sub download_ttyrecs {
   for my $url (@tofetch) {
     my $path = ttyrec_path($url->{u});
     fetch_url($url->{u}, ttyrec_path($url->{u}));
-    if ($url->{u} =~ /.bz2/) {
-      system "bunzip2 -f " . ttyrec_path($url->{u})
-        and die "Couldn't bunzip $url->{u}\n";
-      $url->{u} =~ s/\.bz2$//;
-    }
+    uncompress_ttyrec($url);
     $sz += -s(ttyrec_path($url->{u}));
   }
 
@@ -670,6 +697,7 @@ sub pick_random_unplayed {
     clear_played_games();
     scan_ttyrec_list();
   }
+  die "No games?" unless @TVGAMES;
   my $game = $TVGAMES[int(rand(@TVGAMES))];
   record_played_game($game);
   $game
@@ -865,22 +893,21 @@ sub tv_play_ttyrec {
   my $delta = delta_seconds(DateCalc($ttyrec_time, $end_time));
   my $fc = 0;
   my $lastclear = 0;
+  my $lastgoodclear = 0;
   while (my $fref = $t->next_frame()) {
     if ($skipsize) {
       my $pos = tell($t->filehandle());
       my $hasclear = index($fref->{data}, "\033[2J") > -1;
       $lastclear = $pos if $hasclear;
+      $lastgoodclear = $pos
+        if $hasclear && $size - $pos < $TTYRDEFSZ * 2
+          && $size - $pos >= $TTYRDEFSZ;
+
       next if $pos < $skipsize;
       if (index($fref->{data}, "\033[2J") > -1) {
         undef $skipsize;
 
         my $size_left = $size - $pos;
-        if ($size_left < $TTYRDEFSZ && $size - $lastclear < $TTYRDEFSZ * 2) {
-          print "Scanned forward too far, resetting to $lastclear\n";
-          close($t->filehandle());
-          return tv_play_ttyrec($g, $ttyrec, $lastclear);
-        }
-
         print "Done skip, starting normal playback\n";
       } else {
         next;
