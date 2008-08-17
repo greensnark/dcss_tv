@@ -936,7 +936,7 @@ sub tv_play_ttyrec {
     }
     select undef, undef, undef, $fref->{diff};
     print $SOCK tv_frame_strip($fref->{data});
-    last if is_death_frame($fref->{data});
+    select undef, undef, undef, 0.5 if is_death_frame($fref->{data});
   }
 
   close($t->filehandle());
