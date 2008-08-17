@@ -42,9 +42,9 @@ my @LOG_FILES = map { m{.*/(.*)} } @LOG_URLS;
 
 my @IPLACES = qw/Tomb Dis Tar Geh Coc Vault Crypt Zot Pan/;
 
-my $CAO_UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
-my $CAO_BEFORE = DateCalc($CAO_UTC_EPOCH, "-1 days");
-my $CAO_AFTER = DateCalc($CAO_UTC_EPOCH, "+2 days");
+my $UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
+my $UTC_BEFORE = DateCalc($UTC_EPOCH, "-1 days");
+my $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
 
 my %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
@@ -389,7 +389,7 @@ sub interesting_game {
 
   # If the game was in the hazy date range when Crawl was between
   # UTC and local time, skip.
-  return if ($end ge $CAO_BEFORE && $end le $CAO_AFTER);
+  return if ($end ge $UTC_BEFORE && $end le $UTC_AFTER);
 
   print desc_game($g), " looks interesting!\n" if $good;
   $good
@@ -441,7 +441,7 @@ sub tty_time {
   my $parsed = ParseDate("$stripped UTC");
 
   # If it was before the UTC epoch, parse it as the appropriate local time.
-  $parsed = tty_tz_time($g, $time) if $parsed lt $CAO_UTC_EPOCH;
+  $parsed = tty_tz_time($g, $time) if $parsed lt $UTC_EPOCH;
   $parsed
 }
 
