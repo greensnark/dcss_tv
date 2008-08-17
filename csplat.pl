@@ -632,22 +632,21 @@ sub trawl_games {
   for my $log (@LOG_URLS) {
     # Go to last point that we processed.
     my $fh = seek_log($log);
-    $DBH->begin_work;
     while (my $game = read_log($fh, $log)) {
-      if (interesting_game($game) && fetch_ttyrecs($game)) {
-        $games++;
-        record_game($game);
-      }
+
+      my $good_game = interesting_game($game) && fetch_ttyrecs($game);
+      $games++ if $good_game;
+
+      $DBH->begin_work;
+      record_game($game) if $good_game;
       record_log_place($log, $game);
+      $DBH->commit;
 
       if (!(++$lines % 100)) {
         my $total = $games + $existing_games;
         print "Scanned $lines lines, found $total interesting games\n";
-        $DBH->commit;
-        $DBH->begin_work;
       }
     }
-    $DBH->commit;
   }
 }
 
