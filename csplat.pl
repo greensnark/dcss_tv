@@ -75,7 +75,7 @@ my %CACHED_TTYREC_URLS;
 my %opt;
 
 # Fetch mode by default.
-GetOptions(\%opt, 'tv', 'rescan', 'local');
+GetOptions(\%opt, 'tv', 'rescan', 'local', 'migrate');
 
 my $DBH;
 
@@ -90,6 +90,22 @@ sub fetch {
     print "Sleeping between log scans...\n";
     sleep 600;
     %CACHED_TTYREC_URLS = ();
+  }
+}
+
+sub migrate_paths {
+  open_db();
+
+  my @games = fetch_all_games();
+  for my $g (@games) {
+    print "Processing ", desc_game($g), "\n";
+
+    for my $ttyrec (split / /, $g->{ttyrecs}) {
+      my $old_path = "$TTYREC_DIR/" . url_file($ttyrec);
+      my $new_path = ttyrec_path($g, $ttyrec);
+      print "Found ttyrec at $old_path, moving it to $new_path\n";
+      rename $old_path, $new_path or die "Couldn't rename $old_path: $!\n";
+    }
   }
 }
 
@@ -140,7 +156,7 @@ sub delete_game {
   # There's a distinct time window here where we could inconvenience a parallel
   # tv player script, but that can't be helped.
   for my $ttyrec (split / /, $g->{ttyrecs}) {
-    my $file = ttyrec_path($ttyrec);
+    my $file = ttyrec_path($g, $ttyrec);
     if (-f $file) {
       print "Deleting $file\n";
       unlink $file;
@@ -217,8 +233,11 @@ sub log_path {
 }
 
 sub ttyrec_path {
-  my $url = shift;
-  $TTYREC_DIR . "/" . url_file($url)
+  my ($g, $url) = @_;
+  my $server = game_server($g);
+  my $dir = "$TTYREC_DIR/$server/$g->{name}";
+  mkpath( [ $dir ] ) unless -d $dir;
+  $dir . "/" . url_file($url)
 }
 
 sub fetch_url {
@@ -501,14 +520,14 @@ sub fudge_size {
 }
 
 sub uncompress_ttyrec {
-  my $url = shift;
+  my ($g, $url) = @_;
   if ($url->{u} =~ /.bz2$/) {
-    system "bunzip2 -f " . ttyrec_path($url->{u})
+    system "bunzip2 -f " . ttyrec_path($g, $url->{u})
       and die "Couldn't bunzip $url->{u}\n";
     $url->{u} =~ s/\.bz2$//;
   }
   if ($url->{u} =~ /.gz$/) {
-    system "gunzip -f " . ttyrec_path($url->{u})
+    system "gunzip -f " . ttyrec_path($g, $url->{u})
       and die "Couldn't gunzip $url->{u}\n";
     $url->{u} =~ s/\.gz$//;
   }
@@ -542,10 +561,10 @@ sub download_ttyrecs {
   print "Downloading ", scalar(@tofetch), " ttyrecs for ", desc_game($g), "\n";
   $sz = 0;
   for my $url (@tofetch) {
-    my $path = ttyrec_path($url->{u});
-    fetch_url($url->{u}, ttyrec_path($url->{u}));
-    uncompress_ttyrec($url);
-    $sz += -s(ttyrec_path($url->{u}));
+    my $path = ttyrec_path($g, $url->{u});
+    fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
+    uncompress_ttyrec($g, $url);
+    $sz += -s(ttyrec_path($g, $url->{u}));
   }
 
   $g->{sz} = $sz;
@@ -863,7 +882,7 @@ sub is_death_frame {
 
 sub tv_play_ttyrec {
   my ($g, $ttyrec, $skip) = @_;
-  my $ttyfile = ttyrec_path($ttyrec);
+  my $ttyfile = ttyrec_path($g, $ttyrec);
   server_connect();
   #check_watchers();
 
@@ -929,6 +948,9 @@ sub tv_play_ttyrec {
 
 if ($opt{tv}) {
   run_tv();
+}
+elsif ($opt{migrate}) {
+  migrate_paths();
 }
 else {
   fetch();
