@@ -12,6 +12,7 @@ use File::Path;
 use Date::Manip;
 use DBI;
 use LWP::Simple;
+use Getopt::Long;
 use Carp;
 use Fcntl qw/SEEK_SET/;
 
@@ -58,26 +59,86 @@ my $TTYRMAXSZ = 20 * 1024 * 1024;
 # Default ttyrec length.
 my $TTYRDEFSZ = 130 * 1024;
 
-my $MINPLAYLIST = 15;
-
 # Approximate compression of a ttyrec.bzip2
 my $BZ2X = 11;
 
-my $NOTTYP = 1;
-
+my %FETCHED_GAMES;
 my %CACHED_TTYREC_URLS;
+
+my %opt;
+
+# Fetch mode by default.
+GetOptions(\%opt, 'tv', 'rescan', 'local');
 
 my $DBH;
 
-sub main {
+sub fetch {
   check_dirs();
   open_db();
-  fetch_logs(@LOG_URLS);
+  update_fetched_games();
+  rescan_games() if $opt{rescan};
   while (1) {
+    fetch_logs(@LOG_URLS);
     trawl_games();
     sleep 600;
     %CACHED_TTYREC_URLS = ();
   }
+}
+
+sub game_unique_key {
+  my $g = shift;
+  "$g->{name}|$g->{end}|$g->{src}"
+}
+
+sub record_fetched_game {
+  my $g = shift;
+  $FETCHED_GAMES{game_unique_key($g)} = 1;
+}
+
+sub update_fetched_games {
+  my @games = fetch_all_games();
+  for my $g (@games) {
+    record_fetched_game($g);
+  }
+}
+
+sub game_was_fetched {
+  my $g = shift;
+  $FETCHED_GAMES{game_unique_key($g)}
+}
+
+# Goes through all the games we've flagged in the DB, deleting those
+# that don't match interesting_game.
+sub rescan_games {
+  my @games = fetch_all_games();
+  $DBH->begin_work;
+  for my $g (@games) {
+    if (!interesting_game($g)) {
+      delete_game($g);
+    }
+  }
+
+  my $purge = "DELETE FROM logplace";
+  # And reset our log positions so we rescan the entire logfile.
+  check_exec($purge, sub { $DBH->do("DELETE FROM logplace") });
+
+  $DBH->commit;
+}
+
+sub delete_game {
+  my $g = shift;
+  print "Discarding game: ", desc_game($g), "\n";
+
+  # There's a distinct time window here where we could inconvenience a parallel
+  # tv player script, but that can't be helped.
+  for my $ttyrec (split / /, $g->{ttyrecs}) {
+    my $file = ttyrec_path($ttyrec);
+    if (-f $file) {
+      print "Deleting $file\n";
+      unlink $file;
+    }
+  }
+  exec_query("DELETE FROM ttyrec WHERE id = ?", $g->{id});
 }
 
 sub check_dirs {
@@ -124,6 +185,12 @@ T2
      ttyrecs TEXT
   );
 T3
+                   <<'T4',
+  CREATE TABLE played_games (
+     ref_id INTEGER,
+     FOREIGN KEY (ref_id) REFERENCES ttyrec (id)
+  );
+T4
                    );
   for my $line (@ddl_lines) {
     $dbh->do($line) or die "Can't create table schema!";
@@ -182,6 +249,17 @@ sub exec_query {
   $st
 }
 
+sub exec_do {
+  my $query = shift;
+  check_exec($query, sub { $DBH->do($query) })
+}
+
+sub exec_all {
+  my $query = shift;
+  check_exec($query,
+             sub { $DBH->selectall_arrayref($query) })
+}
+
 sub query_one {
   my ($query, @pars) = @_;
   if (@pars) {
@@ -235,7 +313,8 @@ sub read_log {
   my ($fh, $log) = @_;
   my $pos = tell $fh;
   my $line = <$fh>;
-  return unless $line =~ /\n$/;
+  return unless defined($line) && $line =~ /\n$/;
+
   chomp $line;
   my $fields = xlog_line($line);
   $fields->{offset} = $pos;
@@ -245,6 +324,7 @@ sub read_log {
 
 sub record_game {
   my $game = shift;
+  record_fetched_game($game);
   exec_query("INSERT INTO ttyrec (logrecord, ttyrecs)
               VALUES (?, ?)",
              xlog_str($game), $game->{ttyrecs});
@@ -255,22 +335,10 @@ sub record_log_place {
   exec_query("INSERT INTO logplace (logfile, offset)
               VALUES (?, ?)",
              $log, $game->{offset});
-}
-
-sub start_ttyplay {
-  print "Forking tty player.";
-  undef $NOTTYP;
-
-  return if $FETCH_ONLY;
-
-  my $pid = fork;
-  die "Couldn't fork tv!\n" unless defined $pid;
-
-  # Parent returns here.
-  return if $pid != 0;
-
-  # The child runs tv forever.
-  run_tv();
+  # Discard old records.
+  exec_query("DELETE FROM logplace
+              WHERE logfile = ? AND offset < ?",
+             $log, $game->{offset});
 }
 
 sub place_prefix {
@@ -291,8 +359,9 @@ sub is_interesting_place {
   my ($place, $xl) = @_;
   my $prefix = place_prefix($place);
   my $depth = place_depth($place);
-  return 1 if $prefix eq 'Elf' && $depth == 7;
-  return 1 if $prefix eq 'Slime' && $depth == 6;
+  return 1 if $place eq 'Elf:7' && $xl >= 21;
+  return 1 if $place eq 'Vault:8' && $xl >= 16;
+  return 1 if $place eq 'Slime:6';
   return if $prefix eq 'Vault' && $xl < 24;
   ($place =~ "Abyss" && $xl > 24)
     || grep($prefix eq $_, @IPLACES)
@@ -301,6 +370,9 @@ sub is_interesting_place {
 sub interesting_game {
   my $g = shift;
 
+  # Just in case, check for wizmode games.
+  return if $g->{wiz};
+
   my $ktyp = $g->{ktyp};
   return if grep($ktyp eq $_, qw/quitting leaving winning/);
 
@@ -308,6 +380,17 @@ sub interesting_game {
   my $place = $g->{place};
 
   my $good = $xl >= 25 || (is_interesting_place($place, $xl) && $xl > 10);
+
+  my $start = tty_time($g, 'start');
+  my $end = tty_time($g, 'end');
+
+  # Check for the dgl start time bug.
+  return if $start ge $end;
+
+  # If the game was in the hazy date range when Crawl was between
+  # UTC and local time, skip.
+  return if ($end ge $CAO_BEFORE && $end le $CAO_AFTER);
+
   print desc_game($g), " looks interesting!\n" if $good;
   $good
 }
@@ -446,15 +529,12 @@ sub download_ttyrecs {
 
 sub fetch_ttyrecs {
   my $g = shift;
+
+  # Check if we already have the game.
+  return if game_was_fetched($g);
+
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
-
-  # Check for the dgl start time bug.
-  return if $start ge $end;
-
-  # If the game was in the hazy date range when Crawl was between
-  # UTC and local time, skip.
-  return if ($end ge $CAO_BEFORE && $end le $CAO_AFTER);
 
   my @ttyrecs = find_ttyrecs($g) or return;
   @ttyrecs = grep(ttyrec_between($_, $start, $end), @ttyrecs);
@@ -520,7 +600,6 @@ sub trawl_games {
   my $lines = 0;
   my $games = 0;
   my $existing_games = count_existing_games();
-  start_ttyplay() if $existing_games >= $MINPLAYLIST;
 
   for my $log (@LOG_URLS) {
     # Go to last point that we processed.
@@ -530,10 +609,6 @@ sub trawl_games {
       if (interesting_game($game) && fetch_ttyrecs($game)) {
         $games++;
         record_game($game);
-
-        if ($NOTTYP && $games + $existing_games >= $MINPLAYLIST) {
-          start_ttyplay();
-        }
       }
       record_log_place($log, $game);
 
@@ -570,37 +645,61 @@ sub read_password {
 
 my $PASS = read_password();   # pass to use on termcast
 
-sub scan_ttyrec_list {
-  my $query = "SELECT id, logrecord, ttyrecs FROM ttyrec";
-  my $rows =
-    check_exec(
-      $query,
-      sub { $DBH->selectall_arrayref($query) } );
+sub fetch_all_games {
+  my $rows = exec_all("SELECT id, logrecord, ttyrecs FROM ttyrec");
 
-  @TVGAMES = ();
+  my @games;
   for my $row (@$rows) {
     my $id = $row->[0];
     my $g = xlog_line($row->[1]);
     $g->{ttyrecs} = $row->[2];
     $g->{id} = $id;
-    push @TVGAMES, $g;
+    push @games, $g;
   }
+  @games
+}
+
+sub scan_ttyrec_list {
+  @TVGAMES = fetch_all_games();
   die "No games to play!\n" unless @TVGAMES;
   @TVGAMES = grep(!$PLAYED_GAMES{$_->{id}}, @TVGAMES);
 }
 
 sub pick_random_unplayed {
   unless (@TVGAMES) {
-    %PLAYED_GAMES = ();
+    clear_played_games();
     scan_ttyrec_list();
   }
   my $game = $TVGAMES[int(rand(@TVGAMES))];
-  $PLAYED_GAMES{$game->{id}} = 1;
+  record_played_game($game);
   $game
+}
+
+sub record_played_game {
+  my $g = shift;
+
+  $PLAYED_GAMES{$g->{id}} = 1;
+  exec_query("INSERT INTO played_games (ref_id) VALUES (?)",
+             $g->{id});
+}
+
+sub clear_played_games {
+  %PLAYED_GAMES = ();
+  exec_do("DELETE FROM played_games");
+}
+
+sub load_played_games {
+  my $rrows = exec_all("SELECT ref_id FROM played_games");
+  for my $row (@$rrows) {
+    $PLAYED_GAMES{$row->[0]} = 1;
+  }
 }
 
 sub run_tv {
   reopen_db();
+
+  load_played_games();
+
   my $old;
   while (1) {
     # Check for new ttyrecs in the DB.
@@ -656,11 +755,11 @@ sub server_reconnect {
 }
 
 sub server_connect {
-#   if (1) {
-#     $SOCK = \*STDOUT;
-#     $SOCK->autoflush;
-#     return $SOCK;
-#   }
+  if ($opt{local}) {
+    $SOCK = \*STDOUT;
+    $SOCK->autoflush;
+    return $SOCK;
+  }
   while (!defined($SOCK)) {
     server_reconnect($SERVER, $PORT, $NAME, $PASS);
     last if defined $SOCK;
@@ -705,15 +804,33 @@ sub check_watchers {
   }
 }
 
-sub tv_frame_filter {
-  my ($rdat, $rts, $rpts) = @_;
+sub tv_frame_strip {
+  my $rdat = shift;
+
   # Strip IBM graphics, kthx.
-  $$rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
+  $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
+
+  # Strip unicode. Rather pricey :(
+  $rdat =~ s/\xe2\x96\x92/#/g;
+  $rdat =~ s/\xe2\x96\x91/*/g;
+  $rdat =~ s/\xc2\xb7/./g;
+  $rdat =~ s/\xe2\x97\xa6/,/g;
+  $rdat =~ s/\xe2\x97\xbc/+/g;
+  $rdat =~ s/\xe2\x88\xa9/\\/g;
+  $rdat =~ s/\xe2\x8c\xa0/}/g;
+  $rdat =~ s/\xe2\x89\x88/{/g;
+
+  $rdat
 }
 
 sub delta_seconds {
   my $delta = shift;
   Delta_Format($delta, 0, "%sh")
+}
+
+sub is_death_frame {
+  my $frame = shift;
+  $frame =~ /You die\.\.\./;
 }
 
 sub tv_play_ttyrec {
@@ -726,7 +843,7 @@ sub tv_play_ttyrec {
   my $skipsize = 0;
 
   if ($skip) {
-    if ($skip > 0) {
+    if ($skip > 0 && $skip < $size) {
       $skipsize = $skip;
     }
     else {
@@ -741,8 +858,7 @@ sub tv_play_ttyrec {
   print "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
-                                  time_threshold => 3,
-                                  frame_filter => \&tv_frame_filter);
+                                  time_threshold => 3);
   my $ttyrec_time = ttyrec_file_time($ttyfile);
   my $end_time = tty_time($g, 'end');
 
@@ -757,14 +873,22 @@ sub tv_play_ttyrec {
       next if $pos < $skipsize;
       if (index($fref->{data}, "\033[2J") > -1) {
         undef $skipsize;
+
+        my $size_left = $size - $pos;
+        if ($size_left < $TTYRDEFSZ && $size - $lastclear < $TTYRDEFSZ * 2) {
+          print "Scanned forward too far, resetting to $lastclear\n";
+          close($t->filehandle());
+          return tv_play_ttyrec($g, $ttyrec, $lastclear);
+        }
+
         print "Done skip, starting normal playback\n";
       } else {
         next;
       }
     }
     select undef, undef, undef, $fref->{diff};
-    print $SOCK $fref->{data};
-    #tv_show_overlay($delta - $fref->{relative_time}, $end_time, $g->{tmsg});
+    print $SOCK tv_frame_strip($fref->{data});
+    last if is_death_frame($fref->{data});
   }
 
   close($t->filehandle());
@@ -774,37 +898,11 @@ sub tv_play_ttyrec {
   }
 }
 
-my $OVY = 15;
-my $OVX = 40;
-
-sub format_seconds {
-  my $raw = shift;
-  my $s = int($raw) % 60;
-  $raw = int($raw / 60);
-  my $m = $raw % 60;
-  sprintf("%02d:%02d", $m, $s)
-}
-
-sub tv_overlay_text {
-  my ($delta, $end, $tmsg) = @_;
-  my $text = format_seconds($delta) . ": $tmsg";
-  $text = substr($text, 0, 39) if length($text) > 39;
-  $text
-}
-
-sub tv_show_overlay {
-  my ($delta, $end, $tmsg) = @_;
-  my $overlay_text = tv_overlay_text($delta, $end, $tmsg);
-  print $SOCK "\033[$OVY;${OVX}H$overlay_text\033[K";
-}
-
 #######################################################################
 
-$FETCH_ONLY = grep /-fetch/, @ARGV;
-
-if (grep /-tv/, @ARGV) {
+if ($opt{tv}) {
   run_tv();
 }
 else {
-  main();
+  fetch();
 }
