@@ -42,8 +42,8 @@ my @LOG_FILES = map { m{.*/(.*)} } @LOG_URLS;
 
 my @IPLACES = qw/Tomb Dis Tar Geh Coc Vault Crypt Zot Pan/;
 
-my $CAO_UTC_EPOCH = ParseDate("2008-08-07 03:30 UTC");
-my $CAO_BEFORE = DateCalc($CAO_UTC_EPOCH, "-2 days");
+my $CAO_UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
+my $CAO_BEFORE = DateCalc($CAO_UTC_EPOCH, "-1 days");
 my $CAO_AFTER = DateCalc($CAO_UTC_EPOCH, "+2 days");
 
 my %SERVMAP =
