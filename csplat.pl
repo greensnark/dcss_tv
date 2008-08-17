@@ -103,8 +103,10 @@ sub migrate_paths {
     for my $ttyrec (split / /, $g->{ttyrecs}) {
       my $old_path = "$TTYREC_DIR/" . url_file($ttyrec);
       my $new_path = ttyrec_path($g, $ttyrec);
-      print "Found ttyrec at $old_path, moving it to $new_path\n";
-      rename $old_path, $new_path or die "Couldn't rename $old_path: $!\n";
+      if (-f $old_path) {
+        print "Found ttyrec at $old_path, moving it to $new_path\n";
+        rename $old_path, $new_path or die "Couldn't rename $old_path: $!\n";
+      }
     }
   }
 }
