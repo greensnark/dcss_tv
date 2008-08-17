@@ -369,6 +369,7 @@ sub is_interesting_place {
   my $depth = place_depth($place);
   return 1 if $place eq 'Elf:7' && $xl >= 21;
   return 1 if $place eq 'Vault:8' && $xl >= 16;
+  return 1 if $place eq 'Blade' && $xl >= 18;
   return 1 if $place eq 'Slime:6';
   return if $prefix eq 'Vault' && $xl < 24;
   ($place =~ "Abyss" && $xl > 24)
