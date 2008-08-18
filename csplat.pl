@@ -592,14 +592,20 @@ sub fetch_ttyrecs {
   my $g = shift;
 
   # Check if we already have the game.
-  return if game_was_fetched($g);
+  if (game_was_fetched($g)) {
+    print "Skipping already fetched game: ", desc_game($g), "\n";
+    return;
+  }
 
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
 
   my @ttyrecs = find_ttyrecs($g) or return;
   @ttyrecs = grep(ttyrec_between($_, $start, $end), @ttyrecs);
-  return unless @ttyrecs;
+  unless (@ttyrecs) {
+    warn "No ttyrecs between $start and $end for ", desc_game($g), "\n";
+    return;
+  }
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @ttyrecs));
   $g->{ttyrecurls} = \@ttyrecs;
