@@ -1,0 +1,7 @@
+# Meow's ttyrecs are always borked for some reason
+name=Meow
+name=Cuckatoo
+
+# Ignore lame suicides.
+name=Eronarn:ktyp=lava
+name=uru:ktyp=lava

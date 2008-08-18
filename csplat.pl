@@ -49,6 +49,11 @@ my $UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
 my $UTC_BEFORE = DateCalc($UTC_EPOCH, "-1 days");
 my $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
 
+my $BLACKLIST = 'blacklist.txt';
+
+# Games blacklisted.
+my @BLACKLISTED;
+
 my %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
                              dsttz => 'EDT',
@@ -92,6 +97,28 @@ sub fetch {
     sleep 600;
     %CACHED_TTYREC_URLS = ();
   }
+}
+
+sub load_blacklist {
+  open my $inf, '<', $BLACKLIST or return;
+  while (<$inf>) {
+    next unless /\S/ and !/^\s*#/;
+    my $game = xlog_line($_);
+    push @BLACKLISTED, $game;
+  }
+  close $inf;
+}
+
+sub is_blacklisted {
+  my $g = shift;
+BLACK_MAIN:
+  for my $b (@BLACKLISTED) {
+    for my $key (keys %$b) {
+      next BLACK_MAIN if $$b{$key} ne $$g{$key};
+    }
+    return 1;
+  }
+  undef
 }
 
 # Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
@@ -356,7 +383,7 @@ sub seek_log {
 }
 
 sub xlog_line {
-  my $text = shift;
+  chomp(my $text = shift);
   $text =~ s/::/\n/g;
   my @fields = map { (my $x = $_) =~ tr/\n/:/; $x } split /:/, $text;
   my %hash = map /^(\w+)=(.*)/, @fields;
@@ -428,8 +455,8 @@ sub is_interesting_place {
   my ($place, $xl) = @_;
   my $prefix = place_prefix($place);
   my $depth = place_depth($place);
-  return 1 if $place eq 'Elf:7' && $xl >= 21;
-  return 1 if $place eq 'Vault:8' && $xl >= 16;
+  return 1 if $place eq 'Elf:7' && $xl >= 17;
+  return 1 if $place =~ /Vault:[78]/ && $xl >= 16;
   return 1 if $place eq 'Blade' && $xl >= 18;
   return 1 if $place eq 'Slime:6';
   return if $prefix eq 'Vault' && $xl < 24;
@@ -439,8 +466,10 @@ sub is_interesting_place {
     || $place eq 'Hive:4'
 }
 
-my @COOL_UNIQUES = qw/Boris Frederick Geryon Xtahua Murray Norris Margery/;
-my %COOL_UNIQUES = map($_ => 1, @COOL_UNIQUES);
+my @COOL_UNIQUES = qw/Boris Frederick Geryon Xtahua Murray
+                      Norris Margery Rupert/;
+
+my %COOL_UNIQUES = map(($_ => 1), @COOL_UNIQUES);
 
 sub interesting_game {
   my $g = shift;
@@ -464,6 +493,10 @@ sub interesting_game {
   # UTC and local time, skip.
   return if ($end ge $UTC_BEFORE && $end le $UTC_AFTER);
 
+  if (is_blacklisted($g)) {
+    warn "Game is blacklisted: ", desc_game($g), "\n";
+    return;
+  }
 
   my $xl = $g->{xl};
   my $place = $g->{place};
@@ -1032,6 +1065,7 @@ sub tv_play_ttyrec {
 #######################################################################
 
 open_db();
+load_blacklist();
 if ($opt{tv}) {
   run_tv();
 }
