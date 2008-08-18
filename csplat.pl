@@ -76,13 +76,13 @@ my %CACHED_TTYREC_URLS;
 my %opt;
 
 # Fetch mode by default.
-GetOptions(\%opt, 'tv', 'rescan', 'local', 'migrate');
+GetOptions(\%opt, 'tv', 'rescan', 'local', 'migrate',
+           'sanity-check', 'sanity-fix');
 
 my $DBH;
 
 sub fetch {
   check_dirs();
-  open_db();
   update_fetched_games();
   rescan_games() if $opt{rescan};
   while (1) {
@@ -94,9 +94,26 @@ sub fetch {
   }
 }
 
-sub migrate_paths {
-  open_db();
+# Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
+# will also delete games that have no death ttyrecs.
+sub sanity_check {
+  my @games = fetch_all_games();
+  print "Running sanity-check";
+  print ", will fix errors." if $opt{'sanity-fix'};
+  print "\n";
 
+  for my $g (@games) {
+    my @ttyrecs = split / /, $g->{ttyrecs};
+    if (!is_death_ttyrec($g, $ttyrecs[-1])) {
+      warn "Game has no death ttyrec: ", desc_game($g), "\n";
+      if ($opt{'sanity-fix'}) {
+        delete_game($g);
+      }
+    }
+  }
+}
+
+sub migrate_paths {
   my @games = fetch_all_games();
   for my $g (@games) {
     print "Processing ", desc_game($g), "\n";
@@ -547,6 +564,22 @@ sub uncompress_ttyrec {
   }
 }
 
+sub is_death_ttyrec {
+  my ($g, $u) = @_;
+  my $file = ttyrec_path($g, $u);
+  # Set line delimiter to escape for sane grepping through ttyrecs.
+  local $/ = "\033";
+  open my $inf, '<', $file
+    or do {
+      warn "Couldn't open $file: $!\n";
+      return;
+    };
+  while (<$inf>) {
+    return 1 if /You die\.\.\./;
+  }
+  undef
+}
+
 sub download_ttyrecs {
   my $g = shift;
 
@@ -579,6 +612,15 @@ sub download_ttyrecs {
     fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
     uncompress_ttyrec($g, $url);
     $sz += -s(ttyrec_path($g, $url->{u}));
+  }
+
+  # Do we have a ttyrec with "You die..."? If not, discard the lot.
+  unless (is_death_ttyrec($g, $tofetch[-1]->{u})) {
+    for my $ttyrec (@tofetch) {
+      unlink ttyrec_path($g, $ttyrec->{u});
+    }
+    warn "Game has no death ttyrec: ", desc_game($g), "\n";
+    return undef;
   }
 
   $g->{sz} = $sz;
@@ -767,8 +809,6 @@ sub load_played_games {
 }
 
 sub run_tv {
-  reopen_db();
-
   load_played_games();
 
   my $old;
@@ -969,11 +1009,15 @@ sub tv_play_ttyrec {
 
 #######################################################################
 
+open_db();
 if ($opt{tv}) {
   run_tv();
 }
 elsif ($opt{migrate}) {
   migrate_paths();
+}
+elsif ($opt{'sanity-check'}) {
+  sanity_check();
 }
 else {
   fetch();
