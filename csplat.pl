@@ -113,6 +113,7 @@ sub sanity_check {
     }
 
     if (ttyrecs_out_of_time_bounds($g)) {
+      warn "Game has out-of-range ttyrecs: ", desc_game($g), "\n";
       if ($opt{'sanity-fix'}) {
         delete_game($g);
       }
