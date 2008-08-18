@@ -59,8 +59,9 @@ my %SERVMAP =
 # Smallest cumulative length of ttyrec that's acceptable.
 my $TTYRMINSZ = 60 * 1024;
 
-# Largest cumulative length of ttyrec.
-my $TTYRMAXSZ = 20 * 1024 * 1024;
+# Largest cumulative length of ttyrec. The longer it gets, the harder we
+# have to work to seek to the fun parts.
+my $TTYRMAXSZ = 70 * 1024 * 1024;
 
 # Default ttyrec length.
 my $TTYRDEFSZ = 130 * 1024;
