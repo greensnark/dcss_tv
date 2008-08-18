@@ -75,6 +75,9 @@ my $TTYRDEFSZ = 130 * 1024;
 my $BZ2X = 11;
 my $GZX = 6.6;
 
+# An appropriately Crawlish number.
+my $PLAYLIST_SIZE = 9;
+
 my %FETCHED_GAMES;
 my %CACHED_TTYREC_URLS;
 
@@ -607,8 +610,31 @@ sub desc_game {
     "after $g->{turn} turns"
 }
 
+sub pad {
+  my ($len, $text) = @_;
+  $text ||= '';
+  $text = substr($text, 0, $len) if length($text) > $len;
+  sprintf("%-${len}s", $text)
+}
+
+sub pad_god {
+  my ($len, $text) = @_;
+  $text ||= '';
+  $text = 'TSO' if $text eq 'The Shining One';
+  $text = 'Nemelex' if $text eq 'Nemelex Xobeh';
+  pad($len, $text)
+}
+
 sub desc_game_brief {
-  desc_game(@_)
+  my $g = shift;
+  # Name, Title, XL, God, place, tmsg.
+  my @pieces = (pad(14, $$g{name}),
+                "L$$g{xl} $$g{char}",
+                pad_god(10, $$g{god}),
+                pad(7, $$g{place}),
+                $$g{tmsg});
+  @pieces = grep($_, @pieces);
+  join("  ", @pieces)
 }
 
 sub fudge_size {
@@ -843,10 +869,10 @@ sub fetch_all_games {
 sub scan_ttyrec_list {
   @TVGAMES = fetch_all_games();
   die "No games to play!\n" unless @TVGAMES;
-  @TVGAMES = grep(!$PLAYED_GAMES{$_->{id}}, @TVGAMES);
 }
 
 sub pick_random_unplayed {
+  @TVGAMES = grep(!$PLAYED_GAMES{$_->{id}}, @TVGAMES);
   unless (@TVGAMES) {
     clear_played_games();
     scan_ttyrec_list();
@@ -855,6 +881,20 @@ sub pick_random_unplayed {
   my $game = $TVGAMES[int(rand(@TVGAMES))];
   record_played_game($game);
   $game
+}
+
+sub build_playlist {
+  my $pref = shift;
+
+  # Check for new ttyrecs in the DB.
+  scan_ttyrec_list();
+
+  # Strip games that went awol while we were playing the last one.
+  @$pref = grep(tv_game_exists($_), @$pref);
+
+  while (@$pref < $PLAYLIST_SIZE) {
+    push @$pref, pick_random_unplayed();
+  }
 }
 
 sub record_played_game {
@@ -881,27 +921,52 @@ sub run_tv {
   load_played_games();
 
   my $old;
+  my @playlist;
   while (1) {
-    # Check for new ttyrecs in the DB.
-    scan_ttyrec_list();
-    my $g = pick_random_unplayed();
-    say_now_playing($g, $old);
-    $old = $g;
-    tv_play($g);
+    build_playlist(\@playlist);
+
+    die "No games to play?" unless @playlist;
+
+    say_now_playing(\@playlist, $old);
+    $old = shift @playlist;
+    tv_play($old);
   }
 }
 
+# Perform a last-minute check to see if the game is still there.
+sub tv_game_exists {
+  my $g = shift;
+  query_one("SELECT COUNT(*) FROM ttyrec WHERE id = ?", $g->{id})
+}
+
+sub clear_screen {
+  print $SOCK "\e[2J";
+}
+
 sub say_now_playing {
-  my ($this, $prev) = @_;
-  $this = desc_game_brief($this);
+  my ($rplay, $prev) = @_;
   server_connect();
+  clear_screen();
   if ($prev) {
-    sleep 5;
+    sleep 3;
     $prev = desc_game_brief($prev);
-    print $SOCK "\e[2J\e[H";
-    print $SOCK "That was \e[1;33m$prev.\e[0m\e[2;0H" if $prev;
+    print $SOCK "\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m";
   }
-  print $SOCK "Now playing \e[1;33m$this\e[0m.";
+
+  my $pos = 1 + ($prev ? 3 : 0);
+  print $SOCK "\e[$pos;1H\e[1;37mComing up:\e[0m";
+  $pos++;
+
+  my $first = 1;
+  for my $game (@$rplay) {
+    # Move to right position:
+    print $SOCK "\e[$pos;1H";
+    print $SOCK $first? "\e[1;34m" : "\e[0m";
+    print $SOCK desc_game_brief($game);
+    print $SOCK "\e[0m" if $first;
+    undef $first;
+    ++$pos;
+  }
   sleep($prev? 3 : 5);
 }
 
@@ -1015,6 +1080,7 @@ sub is_death_frame {
 
 sub tv_play_ttyrec {
   my ($g, $ttyrec, $skip) = @_;
+
   my $ttyfile = ttyrec_path($g, $ttyrec);
   server_connect();
 
