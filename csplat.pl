@@ -109,8 +109,29 @@ sub sanity_check {
       if ($opt{'sanity-fix'}) {
         delete_game($g);
       }
+      next;
+    }
+
+    if (ttyrecs_out_of_time_bounds($g)) {
+      if ($opt{'sanity-fix'}) {
+        delete_game($g);
+      }
+      next;
     }
   }
+}
+
+sub ttyrecs_out_of_time_bounds {
+  my $g = shift;
+  my $start = tty_time($g, 'start');
+  my $end = tty_time($g, 'end');
+  for my $tty (split / /, $g->{ttyrecs}) {
+    if (!ttyrec_between($tty, $start, $end)) {
+      warn "ttyrec is not between $start and $end: ", $tty, "\n";
+      return 1;
+    }
+  }
+  undef
 }
 
 sub migrate_paths {
@@ -514,7 +535,7 @@ sub ttyrec_file_time {
 
 sub ttyrec_between {
   my ($tty, $start, $end) = @_;
-  my $pdate = ttyrec_file_time( $tty->{u} );
+  my $pdate = ttyrec_file_time( $tty );
   $pdate ge $start && $pdate le $end
 }
 
@@ -647,7 +668,7 @@ sub fetch_ttyrecs {
     return;
   };
 
-  @ttyrecs = grep(ttyrec_between($_, $start, $end), @ttyrecs);
+  @ttyrecs = grep(ttyrec_between($_->{u}, $start, $end), @ttyrecs);
   unless (@ttyrecs) {
     warn "No ttyrecs between $start and $end for ", desc_game($g), "\n";
     return;
