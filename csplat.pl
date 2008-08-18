@@ -121,6 +121,17 @@ BLACK_MAIN:
   undef
 }
 
+sub sanity_check_pred {
+  my ($g, $cond, $msg) = @_;
+  if ($cond) {
+    warn "\n$msg: ", desc_game($g), "\n";
+    if ($opt{'sanity-fix'}) {
+      delete_game($g);
+    }
+  }
+  $cond
+}
+
 # Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
 # will also delete games that have no death ttyrecs.
 sub sanity_check {
@@ -129,24 +140,27 @@ sub sanity_check {
   print ", will fix errors." if $opt{'sanity-fix'};
   print "\n";
 
-  for my $g (@games) {
-    my @ttyrecs = split / /, $g->{ttyrecs};
-    if (!is_death_ttyrec($g, $ttyrecs[-1])) {
-      warn "Game has no death ttyrec: ", desc_game($g), "\n";
-      if ($opt{'sanity-fix'}) {
-        delete_game($g);
-      }
-      next;
-    }
+  # Turn on autoflush.
+  local $| = 1;
 
-    if (ttyrecs_out_of_time_bounds($g)) {
-      warn "Game has out-of-range ttyrecs: ", desc_game($g), "\n";
-      if ($opt{'sanity-fix'}) {
-        delete_game($g);
-      }
-      next;
-    }
+  my $gcount = 0;
+  for my $g (@games) {
+    ++$gcount;
+    print "Sanity checking $gcount / ", scalar(@games), "\r";
+
+    my @ttyrecs = split / /, $g->{ttyrecs};
+
+    sanity_check_pred($g, !is_death_ttyrec($g, $ttyrecs[-1]),
+                      "Game has no death ttyrec")
+      ||
+
+        sanity_check_pred($g, ttyrecs_out_of_time_bounds($g),
+                          "Game has out-of-range ttyrecs")
+      ||
+        sanity_check_pred($g, is_blacklisted($g),
+                          "Game is blacklisted");
   }
+  print "\n";
 }
 
 sub ttyrecs_out_of_time_bounds {
