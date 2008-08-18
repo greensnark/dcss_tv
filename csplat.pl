@@ -600,7 +600,11 @@ sub fetch_ttyrecs {
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
 
-  my @ttyrecs = find_ttyrecs($g) or return;
+  my @ttyrecs = find_ttyrecs($g) or do {
+    print "No ttyrecs on server for ", desc_game($g), "?\n";
+    return;
+  };
+
   @ttyrecs = grep(ttyrec_between($_, $start, $end), @ttyrecs);
   unless (@ttyrecs) {
     warn "No ttyrecs between $start and $end for ", desc_game($g), "\n";
