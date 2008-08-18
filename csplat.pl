@@ -395,7 +395,12 @@ sub is_interesting_place {
   return if $prefix eq 'Vault' && $xl < 24;
   ($place =~ "Abyss" && $xl > 24)
     || grep($prefix eq $_, @IPLACES)
+    # Hive drowning is fun!
+    || $place eq 'Hive:4'
 }
+
+my @COOL_UNIQUES = qw/Boris Frederick Geryon Xtahua Murray Norris Margery/;
+my %COOL_UNIQUES = map($_ => 1, @COOL_UNIQUES);
 
 sub interesting_game {
   my $g = shift;
@@ -409,11 +414,6 @@ sub interesting_game {
   # No matter how high level, ignore Temple deaths.
   return if $g->{place} eq 'Temple';
 
-  my $xl = $g->{xl};
-  my $place = $g->{place};
-
-  my $good = $xl >= 25 || (is_interesting_place($place, $xl) && $xl > 10);
-
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
 
@@ -423,6 +423,17 @@ sub interesting_game {
   # If the game was in the hazy date range when Crawl was between
   # UTC and local time, skip.
   return if ($end ge $UTC_BEFORE && $end le $UTC_AFTER);
+
+
+  my $xl = $g->{xl};
+  my $place = $g->{place};
+  my $killer = $g->{killer} || '';
+
+  my $good =
+    $xl >= 25 || (is_interesting_place($place, $xl) && $xl > 10)
+      # High-level player ghost splats.
+      || ($xl >= 15 && $g->{killer} =~ /'s? ghost/)
+      || ($xl >= 15 && $COOL_UNIQUES{$killer});
 
   print desc_game($g), " looks interesting!\n" if $good;
   $good
@@ -886,7 +897,6 @@ sub tv_play_ttyrec {
   my ($g, $ttyrec, $skip) = @_;
   my $ttyfile = ttyrec_path($g, $ttyrec);
   server_connect();
-  #check_watchers();
 
   my $size = -s $ttyfile;
   my $skipsize = 0;
