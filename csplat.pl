@@ -63,7 +63,7 @@ my %SERVMAP =
                            ttypath => 'http://crawl.develz.org/ttyrecs' });
 
 # Smallest cumulative length of ttyrec that's acceptable.
-my $TTYRMINSZ = 120 * 1024;
+my $TTYRMINSZ = 90 * 1024;
 
 # Largest cumulative length of ttyrec. The longer it gets, the harder we
 # have to work to seek to the fun parts.
@@ -957,7 +957,6 @@ sub tv_cache_reset {
 
 sub tv_cache_frame {
   $TERM->process($_[0]);
-  print $_[0];
 }
 
 sub tv_chattr_s {
@@ -1179,12 +1178,15 @@ sub tv_play_ttyrec {
   my $lastgoodclear = 0;
 
   tv_cache_reset();
+
+  warn "Building up from $buildup_from\n" if $buildup_from;
+  my $buildupbegun;
   while (my $fref = $t->next_frame()) {
     if ($skipsize) {
       my $pos = tell($t->filehandle());
       my $hasclear = index($fref->{data}, "\033[2J") > -1;
       $lastclear = $pos if $hasclear;
-      $lastgoodclear = $pos if $size - $pos >= $TTYRMINSZ;
+      $lastgoodclear = $pos if $hasclear && $size - $pos >= $TTYRMINSZ;
 
       if ($buildup_from && $pos >= $buildup_from) {
         tv_cache_frame(tv_frame_strip($fref->{data}));
@@ -1197,23 +1199,20 @@ sub tv_play_ttyrec {
         if ($size_left < $TTYRMINSZ && $lastgoodclear < $pos
             && !$buildup_from)
         {
-          print $SOCK clear_screen();
           warn "Not enough of ttyrec left at $pos, ",
                 "cache-rewinding from $lastgoodclear\n";
-          sleep(2);
           close($t->filehandle());
           return tv_play_ttyrec($g, $ttyrec, $skipsize, $lastgoodclear);
         }
 
         undef $skipsize;
-	my $perc = calc_perc($pos, $size);
+        my $perc = calc_perc($pos, $size);
         warn "Done skip at $pos of $size ($perc), starting normal playback\n";
-	warn "Size left: $size_left, min: $TTYRMINSZ\n";
+        warn "Size left: $size_left, min: $TTYRMINSZ\n";
       } else {
         # If we've been building up a frame in our VT102, spit that out now.
         if ($buildup_from && $buildup_from < $pos) {
           warn "Done skip, writing buffer!\n";
-          sleep 2;
           print $SOCK tv_frame();
           undef $skipsize;
         }
