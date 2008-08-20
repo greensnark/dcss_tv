@@ -927,7 +927,7 @@ sub run_tv {
 
     die "No games to play?" unless @playlist;
 
-    say_now_playing(\@playlist, $old);
+    tv_show_playlist(\@playlist, $old);
     $old = shift @playlist;
     tv_play($old);
   }
@@ -943,12 +943,11 @@ sub clear_screen {
   print $SOCK "\e[2J";
 }
 
-sub say_now_playing {
+sub tv_show_playlist {
   my ($rplay, $prev) = @_;
   server_connect();
   clear_screen();
   if ($prev) {
-    sleep 3;
     $prev = desc_game_brief($prev);
     print $SOCK "\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m";
   }
@@ -967,7 +966,7 @@ sub say_now_playing {
     undef $first;
     ++$pos;
   }
-  sleep($prev? 3 : 5);
+  sleep(5);
 }
 
 # Reconnect (or connect) to the termcast server and do the handshake.
