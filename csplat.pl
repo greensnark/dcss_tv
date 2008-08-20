@@ -63,7 +63,7 @@ my %SERVMAP =
                            ttypath => 'http://crawl.develz.org/ttyrecs' });
 
 # Smallest cumulative length of ttyrec that's acceptable.
-my $TTYRMINSZ = 90 * 1024;
+my $TTYRMINSZ = 120 * 1024;
 
 # Largest cumulative length of ttyrec. The longer it gets, the harder we
 # have to work to seek to the fun parts.
@@ -1074,8 +1074,8 @@ sub tv_play {
 
   my $sz = $g->{sz};
   my $skipsize = 0;
-  if ($sz > $TTYRDEFSZ * 1.5) {
-    $skipsize = $sz - int($TTYRDEFSZ * 1.5);
+  if ($sz > $TTYRDEFSZ) {
+    $skipsize = $sz - $TTYRDEFSZ;
   }
 
   for my $ttyrec (split / /, $g->{ttyrecs}) {
@@ -1145,6 +1145,12 @@ sub is_death_frame {
   $frame =~ /You die\.\.\./;
 }
 
+sub calc_perc {
+  my ($num, $den) = @_;
+  return "0.0" if $den == 0;
+  sprintf "%.2f%%", ($num * 100 / $den)
+}
+
 sub tv_play_ttyrec {
   my ($g, $ttyrec, $skip, $buildup_from) = @_;
 
@@ -1156,10 +1162,11 @@ sub tv_play_ttyrec {
 
   if ($skip) {
     $skipsize = $skip if $skip > 0 && $skip < $size;
-    print "\nNeed to skip $skipsize of $size bytes\n" if $skipsize;
+    my $perc = calc_perc($skipsize, $size);
+    warn "\nNeed to skip $skipsize of $size ($perc) bytes\n" if $skipsize;
   }
 
-  print "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
+  warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
                                   time_threshold => 3);
@@ -1190,8 +1197,8 @@ sub tv_play_ttyrec {
         if ($size_left < $TTYRMINSZ && $lastgoodclear < $pos
             && !$buildup_from)
         {
-          print $SOCK clrscr();
-          print "Not enough of ttyrec left at $pos, ",
+          print $SOCK clear_screen();
+          warn "Not enough of ttyrec left at $pos, ",
                 "cache-rewinding from $lastgoodclear\n";
           sleep(2);
           close($t->filehandle());
@@ -1199,11 +1206,13 @@ sub tv_play_ttyrec {
         }
 
         undef $skipsize;
-        print "Done skip, starting normal playback\n";
+	my $perc = calc_perc($pos, $size);
+        warn "Done skip at $pos of $size ($perc), starting normal playback\n";
+	warn "Size left: $size_left, min: $TTYRMINSZ\n";
       } else {
         # If we've been building up a frame in our VT102, spit that out now.
         if ($buildup_from && $buildup_from < $pos) {
-          print "Done skip, writing buffer!\n";
+          warn "Done skip, writing buffer!\n";
           sleep 2;
           print $SOCK tv_frame();
           undef $skipsize;
