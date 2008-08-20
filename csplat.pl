@@ -63,7 +63,7 @@ my %SERVMAP =
                            ttypath => 'http://crawl.develz.org/ttyrecs' });
 
 # Smallest cumulative length of ttyrec that's acceptable.
-my $TTYRMINSZ = 90 * 1024;
+my $TTYRMINSZ = 95 * 1024;
 
 # Largest cumulative length of ttyrec. The longer it gets, the harder we
 # have to work to seek to the fun parts.
