@@ -1197,6 +1197,7 @@ sub tv_play_ttyrec {
       if ($hasclear) {
         my $size_left = $size - $pos;
         if ($size_left < $TTYRMINSZ && $lastgoodclear < $pos
+            && $size - $lastgoodclear >= $TTYRMINSZ
             && !$buildup_from)
         {
           warn "Not enough of ttyrec left at $pos, ",
