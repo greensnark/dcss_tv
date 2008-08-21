@@ -483,7 +483,8 @@ sub is_interesting_place {
   return 1 if $place eq 'Blade' && $xl >= 18;
   return 1 if $place eq 'Slime:6';
   return if $prefix eq 'Vault' && $xl < 24;
-  ($place =~ "Abyss" && $xl > 24)
+  ($place =~ "Abyss" && $xl >= 18)
+    || $place eq 'Lab'
     || grep($prefix eq $_, @IPLACES)
     # Hive drowning is fun!
     || $place eq 'Hive:4'
