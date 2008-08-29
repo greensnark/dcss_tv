@@ -478,8 +478,8 @@ sub is_interesting_place {
   my ($place, $xl) = @_;
   my $prefix = place_prefix($place);
   my $depth = place_depth($place);
-  return 1 if $place eq 'Elf:7' && $xl >= 17;
-  return 1 if $place =~ /Vault:[78]/ && $xl >= 16;
+  return 1 if $place eq 'Elf:7';
+  return 1 if $place =~ /Vault:[78]/;
   return 1 if $place eq 'Blade' && $xl >= 18;
   return 1 if $place eq 'Slime:6';
   return if $prefix eq 'Vault' && $xl < 24;
