@@ -522,7 +522,8 @@ sub interesting_game {
   my $killer = $g->{killer} || '';
 
   my $good =
-    $xl >= 25 || (is_interesting_place($place, $xl) && $xl > 10)
+    $xl >= 25
+      || is_interesting_place($place, $xl)
       # High-level player ghost splats.
       || ($xl >= 15 && $killer =~ /'s? ghost/)
       || ($xl >= 15 && $COOL_UNIQUES{$killer});
