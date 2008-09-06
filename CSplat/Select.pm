@@ -115,6 +115,5 @@ sub interesting_game {
     return;
   }
 
-  print desc_game($g), " looks interesting!\n" if $good;
   $good
 }
