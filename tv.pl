@@ -247,7 +247,7 @@ sub tv_play {
     eval {
       tv_play_ttyrec($g, $ttyrec, $skipsize);
     };
-    die "$@\n" if $@;
+    warn "$@\n" if $@;
     undef $sz;
   }
 }
