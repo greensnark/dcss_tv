@@ -247,14 +247,16 @@ sub tv_play {
     my $thisz = -s(ttyrec_path($g, $ttyrec));
     if ($skipsize >= $thisz) {
       $skipsize -= $thisz;
+      $sz -= $thisz;
       next;
     }
 
     eval {
-      tv_play_ttyrec($g, $ttyrec, $skipsize);
+      tv_play_ttyrec($g, $ttyrec, $sz, $skipsize);
     };
+    $skipsize = 0;
+    $sz -= $thisz;
     warn "$@\n" if $@;
-    undef $sz;
   }
 }
 
@@ -317,7 +319,7 @@ sub calc_perc {
 }
 
 sub tv_play_ttyrec {
-  my ($g, $ttyrec, $skip, $buildup_from) = @_;
+  my ($g, $ttyrec, $total_size, $skip, $buildup_from) = @_;
 
   my $ttyfile = ttyrec_path($g, $ttyrec);
   server_connect();
@@ -327,8 +329,8 @@ sub tv_play_ttyrec {
 
   if ($skip) {
     $skipsize = $skip if $skip > 0 && $skip < $size;
-    my $perc = calc_perc($skipsize, $size);
-    warn "\nNeed to skip $skipsize of $size ($perc) bytes\n" if $skipsize;
+    my $perc = calc_perc($skipsize, $total_size);
+    warn "\nNeed to skip $skipsize of $total_size ($perc) bytes\n" if $skipsize;
   }
 
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
@@ -352,7 +354,7 @@ sub tv_play_ttyrec {
       my $pos = tell($t->filehandle());
       my $hasclear = index($fref->{data}, "\033[2J") > -1;
       $lastclear = $pos if $hasclear;
-      $lastgoodclear = $pos if $hasclear && $size - $pos >= $TTYRMINSZ;
+      $lastgoodclear = $pos if $hasclear && $total_size - $pos >= $TTYRMINSZ;
 
       if ($buildup_from && $pos >= $buildup_from) {
         tv_cache_frame(tv_frame_strip($fref->{data}));
@@ -361,20 +363,22 @@ sub tv_play_ttyrec {
       next if $pos < $skipsize;
 
       if ($hasclear) {
-        my $size_left = $size - $pos;
+        my $size_left = $total_size - $pos;
         if ($size_left < $TTYRMINSZ && $lastgoodclear < $pos
-            && $size - $lastgoodclear >= $TTYRMINSZ
+            && $total_size - $lastgoodclear >= $TTYRMINSZ
             && !$buildup_from)
         {
           warn "Not enough of ttyrec left at $pos, ",
                 "cache-rewinding from $lastgoodclear\n";
           close($t->filehandle());
-          return tv_play_ttyrec($g, $ttyrec, $skipsize, $lastgoodclear);
+          return tv_play_ttyrec($g, $ttyrec, $total_size,
+                                $skipsize, $lastgoodclear);
         }
 
         undef $skipsize;
-        my $perc = calc_perc($pos, $size);
-        warn "Done skip at $pos of $size ($perc), starting normal playback\n";
+        my $perc = calc_perc($pos, $total_size);
+        warn "Done skip at $pos of $total_size ($perc), ",
+          "starting normal playback\n";
         warn "Size left: $size_left, min: $TTYRMINSZ\n";
       } else {
         # If we've been building up a frame in our VT102, spit that out now.
