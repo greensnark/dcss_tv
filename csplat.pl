@@ -13,7 +13,8 @@ use Fcntl qw/SEEK_SET/;
 use CSplat::DB qw/open_db fetch_all_games exec_query query_one in_transaction/;
 use CSplat::Config qw/$DATA_DIR/;
 use CSplat::Ttyrec qw/$TTYREC_DIR url_file fetch_ttyrecs
-                      update_fetched_games fetch_url record_game/;
+                      update_fetched_games fetch_url record_game
+                      clear_cached_urls/;
 use CSplat::Xlog qw/xlog_line/;
 use CSplat::Select qw/interesting_game/;
 
