@@ -6,7 +6,7 @@ use base 'Exporter';
 
 use Date::Manip;
 
-our @EXPORT_OK = qw/is_blacklisted interesting_game/;
+our @EXPORT_OK = qw/is_blacklisted interesting_game filter_matches/;
 
 use CSplat::Config qw/$UTC_BEFORE $UTC_AFTER/;
 use CSplat::Xlog qw/xlog_line desc_game/;
@@ -30,16 +30,17 @@ sub load_blacklist {
   close $inf;
 }
 
+sub filter_matches {
+  my ($filter, $g) = @_;
+  for my $key (keys %$filter) {
+    return if $$filter{$key} ne $$g{$key};
+  }
+  1
+}
+
 sub is_blacklisted {
   my $g = shift;
-BLACK_MAIN:
-  for my $b (@BLACKLISTED) {
-    for my $key (keys %$b) {
-      next BLACK_MAIN if $$b{$key} ne $$g{$key};
-    }
-    return 1;
-  }
-  undef
+  scalar(grep(filter_matches($_, $g), @BLACKLISTED))
 }
 
 sub place_prefix {

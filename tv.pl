@@ -8,9 +8,10 @@ use CSplat::Config qw/game_server/;
 use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
                   fetch_all_games record_played_game
                   clear_played_games query_one/;
-use CSplat::Xlog qw/desc_game desc_game_brief/;
+use CSplat::Xlog qw/desc_game desc_game_brief xlog_line/;
 use CSplat::Ttyrec qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ ttyrec_path
                       ttyrec_file_time tty_time/;
+use CSplat::Select qw/filter_matches/;
 use Term::VT102;
 use Term::TtyRec::Plus;
 use IO::Socket::INET;
@@ -28,7 +29,7 @@ my $TERM = Term::VT102->new(cols => $TERM_X, rows => $TERM_Y);
 my %opt;
 
 # Fetch mode by default.
-GetOptions(\%opt, 'local');
+GetOptions(\%opt, 'local', 'filter=s');
 
 
 ############################  TV!  ####################################
@@ -54,6 +55,11 @@ my $PASS = read_password();   # pass to use on termcast
 
 sub scan_ttyrec_list {
   @TVGAMES = fetch_all_games();
+  if ($opt{filter}) {
+    my $filter = xlog_line($opt{filter});
+    @TVGAMES = grep(filter_matches($filter, $_), @TVGAMES);
+  }
+
   die "No games to play!\n" unless @TVGAMES;
 }
 
