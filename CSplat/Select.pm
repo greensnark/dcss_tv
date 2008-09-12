@@ -13,6 +13,8 @@ use CSplat::Xlog qw/xlog_line desc_game/;
 use CSplat::Ttyrec qw/tty_time/;
 
 my $BLACKLIST = 'blacklist.txt';
+my $SPLAT_HOME = $ENV{SPLAT_HOME};
+$BLACKLIST = "$SPLAT_HOME/$BLACKLIST" if $SPLAT_HOME;
 
 # Games blacklisted.
 my @BLACKLISTED;
@@ -58,19 +60,19 @@ sub place_depth {
 
 sub is_interesting_place {
   # We're interested in Zot, Hells, Vaults, Tomb.
-  my ($place, $xl) = @_;
+  my ($g, $place, $xl) = @_;
+  my $killer = $g->{killer}
   my $prefix = place_prefix($place);
   my $depth = place_depth($place);
+  my $ktyp = $g->{ktyp};
+  return 1 if $place eq 'Lab' && $xl >= 16 && $ktyp ne 'starvation';
   return 1 if $place eq 'Elf:7';
-  return 1 if $place =~ /Vault:[78]/;
+  return 1 if $place =~ /Vault:[3-8]/;
   return 1 if $place eq 'Blade' && $xl >= 18;
   return 1 if $place eq 'Slime:6';
   return if $prefix eq 'Vault' && $xl < 24;
   ($place =~ "Abyss" && $xl >= 18)
-    || $place eq 'Lab'
     || grep($prefix eq $_, @IPLACES)
-    # Hive drowning is fun!
-    || $place eq 'Hive:4'
 }
 
 my @COOL_UNIQUES = qw/Boris Frederick Geryon Xtahua Murray
@@ -105,8 +107,8 @@ sub interesting_game {
   my $killer = $g->{killer} || '';
 
   my $good =
-    $xl >= 25
-      || is_interesting_place($place, $xl)
+    $xl >= 22
+      || is_interesting_place($g, $place, $xl)
       # High-level player ghost splats.
       || ($xl >= 15 && $killer =~ /'s? ghost/)
       || ($xl >= 15 && $COOL_UNIQUES{$killer});
