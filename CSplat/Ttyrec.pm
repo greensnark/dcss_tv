@@ -12,7 +12,7 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ $TTYREC_DIR
 
 use CSplat::Config qw/$DATA_DIR $UTC_EPOCH server_field game_server/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str/;
-use CSplat::DB qw/fetch_all_games exec_query/;
+use CSplat::DB qw/fetch_all_games exec_query in_transaction/;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
@@ -258,23 +258,6 @@ sub find_ttyrecs {
 
   my @urls = fetch_ttyrec_urls_from_server($g->{name}, $userpath);
   @urls
-}
-
-# Goes through all the games we've flagged in the DB, deleting those
-# that don't match interesting_game.
-sub rescan_games {
-  my @games = fetch_all_games();
-
-  in_transaction(
-    sub {
-      for my $g (@games) {
-        if (!interesting_game($g)) {
-          delete_game($g);
-        }
-      }
-
-      purge_log_offsets();
-      } );
 }
 
 sub tty_tz_time {

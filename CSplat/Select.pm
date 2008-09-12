@@ -35,7 +35,7 @@ sub load_blacklist {
 sub filter_matches {
   my ($filter, $g) = @_;
   for my $key (keys %$filter) {
-    return if $$filter{$key} ne $$g{$key};
+    return if $$filter{$key} ne ($$g{$key} || '');
   }
   1
 }
@@ -61,7 +61,7 @@ sub place_depth {
 sub is_interesting_place {
   # We're interested in Zot, Hells, Vaults, Tomb.
   my ($g, $place, $xl) = @_;
-  my $killer = $g->{killer}
+  my $killer = $g->{killer};
   my $prefix = place_prefix($place);
   my $depth = place_depth($place);
   my $ktyp = $g->{ktyp};

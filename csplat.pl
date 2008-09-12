@@ -10,12 +10,13 @@ use Date::Manip;
 use Getopt::Long;
 use Fcntl qw/SEEK_SET/;
 
-use CSplat::DB qw/open_db fetch_all_games exec_query query_one in_transaction/;
+use CSplat::DB qw/open_db fetch_all_games exec_query
+                  query_one in_transaction purge_log_offsets/;
 use CSplat::Config qw/$DATA_DIR/;
 use CSplat::Ttyrec qw/$TTYREC_DIR url_file fetch_ttyrecs
                       update_fetched_games fetch_url record_game
-                      clear_cached_urls/;
-use CSplat::Xlog qw/xlog_line/;
+                      clear_cached_urls ttyrec_path/;
+use CSplat::Xlog qw/xlog_line desc_game/;
 use CSplat::Select qw/interesting_game/;
 
 # Overall strategy:
@@ -95,6 +96,23 @@ sub sanity_check_pred {
     }
   }
   $cond
+}
+
+# Goes through all the games we've flagged in the DB, deleting those
+# that don't match interesting_game.
+sub rescan_games {
+  my @games = fetch_all_games();
+
+  in_transaction(
+    sub {
+      for my $g (@games) {
+        if (!interesting_game($g)) {
+          delete_game($g);
+        }
+      }
+
+      purge_log_offsets();
+      } );
 }
 
 # Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
