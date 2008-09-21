@@ -32,10 +32,20 @@ sub load_blacklist {
   close $inf;
 }
 
+sub field_mangle {
+  my ($field, $v) = @_;
+  return $v unless defined $v;
+  if ($field eq 'start' || $field eq 'end') {
+    $v =~ s/[SD]$//;
+  }
+  $v
+}
+
 sub filter_matches {
   my ($filter, $g) = @_;
   for my $key (keys %$filter) {
-    return if $$filter{$key} ne ($$g{$key} || '');
+    return if field_mangle($key, $$filter{$key}) ne
+       field_mangle($key, ($$g{$key} || ''));
   }
   1
 }
