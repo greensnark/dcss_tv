@@ -210,7 +210,7 @@ sub tty_find_offset_deep {
       # If we have a full hp frame, return that.
       if ($last_full_hp_frame) {
         print "\nFound full hp frame $best_type ($best_hp/$best_maxhp) ",
-          "with size left (", ($tsz - $last_full_hp_frame),
+          "with size left (", ($tsz - $last_full_hp),
           ", avg wanted: $TTYRDEFSZ)!\n";
         return ($ttyrec, $last_full_hp, $last_full_hp_frame);
       }
