@@ -207,7 +207,11 @@ sub tv_show_playlist {
   $pos++;
 
   my $first = 1;
-  for my $game (@$rplay) {
+  my @display = @$rplay;
+  if (@display > $PLAYLIST_SIZE) {
+    @display = @display[0 .. ($PLAYLIST_SIZE - 1)];
+  }
+  for my $game (@display) {
     # Move to right position:
     print $SOCK "\e[$pos;1H";
     print $SOCK $first? "\e[1;34m" : "\e[0m";
