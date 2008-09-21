@@ -17,6 +17,9 @@ use Term::TtyRec::Plus;
 use IO::Socket::INET;
 use Date::Manip;
 
+use threads;
+use threads::shared;
+
 # An appropriately Crawlish number.
 my $PLAYLIST_SIZE = 9;
 
@@ -25,6 +28,14 @@ my $TERM_X = 80;
 my $TERM_Y = 24;
 my $TERM = Term::VT102->new(cols => $TERM_X, rows => $TERM_Y);
 
+# Socket for splat requests.
+my $REQUEST_HOST = 'localhost';  # 'crawl.akrasiac.org';
+my $REQUEST_PORT = 21976;
+my $RSOCK;
+my $request_buf;
+
+# Games requested for TV.
+my $t_requested_games : shared = '';
 
 my %opt;
 
@@ -38,6 +49,7 @@ my $SERVER      = '213.184.131.118'; # termcast server (probably don't change)
 my $PORT        = 31337;             # termcast port (probably don't change)
 my $NAME        = 'C_SPLAT';         # name to use on termcast
 my $thres       = 3;                 # maximum sleep secs on a ttyrec frame
+my @ALLGAMES;
 my @TVGAMES;
 my $SOCK;
 my $WATCHERS = 0;
@@ -54,7 +66,7 @@ sub read_password {
 my $PASS = read_password();   # pass to use on termcast
 
 sub scan_ttyrec_list {
-  @TVGAMES = fetch_all_games();
+  @TVGAMES = @ALLGAMES = fetch_all_games();
   if ($opt{filter}) {
     my $filter = xlog_line($opt{filter});
     @TVGAMES = grep(filter_matches($filter, $_), @TVGAMES);
@@ -81,7 +93,22 @@ sub build_playlist {
   # Check for new ttyrecs in the DB.
   scan_ttyrec_list();
 
-  # Strip games that went awol while we were playing the last one.
+  my @requested_games = get_requested_games();
+
+  if (@requested_games) {
+    # Note that this game is a request.
+    $_->{req} = 'y' for @requested_games;
+
+    # Any requested games go to the top of the playlist.
+    unshift @$pref, @requested_games;
+
+    # And then we eliminate duplicates.
+    my %ids;
+    @$pref = grep(!$ids{$_->{id}}++, @$pref);
+  }
+
+  # Strip games that were in the playlist, but went awol while we were
+  # playing the last game.
   @$pref = grep(tv_game_exists($_), @$pref);
 
   while (@$pref < $PLAYLIST_SIZE) {
@@ -91,6 +118,7 @@ sub build_playlist {
 
 sub run_tv {
   load_played_games();
+  run_splat_request_thread();
 
   my $old;
   my @playlist;
@@ -188,7 +216,69 @@ sub tv_show_playlist {
     undef $first;
     ++$pos;
   }
+
   sleep(5);
+}
+
+# Connect to splat request server.
+sub connect_splat_request {
+  #print "Connecting to splat request server.\n";
+  $RSOCK = IO::Socket::INET->new(PeerAddr => $REQUEST_HOST,
+                                 PeerPort => $REQUEST_PORT,
+                                 Type => SOCK_STREAM,
+                                 Timeout => 30);
+}
+
+sub find_requested_games {
+  my $games = shift;
+
+  my @games;
+  for my $gameline (split /\n/, $games) {
+    next unless $gameline;
+    my $g = xlog_line($gameline);
+    warn "Looking for games matching $gameline\n";
+    push(@games, grep(filter_matches($g, $_), @ALLGAMES));
+  }
+
+  # Toss duplicate requests.
+  my %seen_ids;
+  grep(!$seen_ids{$_->{id}}++, @games)
+}
+
+sub get_requested_games {
+  my $games;
+  {
+    lock($t_requested_games);
+    ($games) = $t_requested_games =~ /(.*\n)/s;
+    $t_requested_games =~ s/(.*\n)//;
+  }
+
+  return unless $games;
+  find_requested_games($games)
+}
+
+sub check_splat_requests {
+  while (1) {
+    connect_splat_request() unless $RSOCK;
+    if ($RSOCK) {
+      while (my $game = <$RSOCK>) {
+        my ($g) = $game =~ /^\d+ (.*)/;
+        chomp $g;
+        {
+          lock($t_requested_games);
+          warn "Request: $g\n";
+          $t_requested_games .= "$g\n";
+        }
+      }
+    }
+    undef $RSOCK;
+    sleep 3;
+  }
+}
+
+sub run_splat_request_thread {
+  my $t = threads->new(\&check_splat_requests);
+  $t->detach;
 }
 
 # Reconnect (or connect) to the termcast server and do the handshake.

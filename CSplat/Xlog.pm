@@ -7,6 +7,8 @@ use base 'Exporter';
 our @EXPORT_OK = qw/xlog_line desc_game desc_game_brief
                     fix_crawl_time game_unique_key xlog_str/;
 
+our $MAX_WIDTH = 80;
+
 sub fix_crawl_time {
   my $time = shift;
   $time =~ s/^(\d{4})(\d{2})/ sprintf "%04d%02d", $1, $2 + 1 /e;
@@ -80,7 +82,15 @@ sub desc_game_brief {
                 pad(7, $$g{place}),
                 $$g{tmsg});
   @pieces = grep($_, @pieces);
-  join("  ", @pieces)
+  my $text = join("  ", @pieces);
+  $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
+
+  if (($g->{req} || '') eq 'y') {
+    my $suffix = " (req)";
+    my $rlen = length($suffix);
+    $text = pad($MAX_WIDTH - $rlen, $text) . $suffix
+  }
+  $text
 }
 
 sub game_unique_key {
