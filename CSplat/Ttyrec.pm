@@ -8,7 +8,9 @@ use base 'Exporter';
 our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ $TTYREC_DIR
                     clear_cached_urls ttyrec_path url_file
                     ttyrec_file_time tty_time fetch_ttyrecs
-                    update_fetched_games fetch_url record_game/;
+                    update_fetched_games fetch_url record_game
+                    tv_frame_strip is_death_ttyrec
+                    ttyrecs_out_of_time_bounds/;
 
 use CSplat::Config qw/$DATA_DIR $UTC_EPOCH server_field game_server/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str/;
@@ -301,6 +303,25 @@ sub ttyrec_path {
   my $dir = "$TTYREC_DIR/$server/$g->{name}";
   mkpath( [ $dir ] ) unless -d $dir;
   $dir . "/" . url_file($url)
+}
+
+sub tv_frame_strip {
+  my $rdat = shift;
+
+  # Strip IBM graphics, kthx.
+  $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
+
+  # Strip unicode. Rather pricey :(
+  $rdat =~ s/\xe2\x96\x92/#/g;
+  $rdat =~ s/\xe2\x96\x91/*/g;
+  $rdat =~ s/\xc2\xb7/./g;
+  $rdat =~ s/\xe2\x97\xa6/,/g;
+  $rdat =~ s/\xe2\x97\xbc/+/g;
+  $rdat =~ s/\xe2\x88\xa9/\\/g;
+  $rdat =~ s/\xe2\x8c\xa0/}/g;
+  $rdat =~ s/\xe2\x89\x88/{/g;
+
+  $rdat
 }
 
 1;

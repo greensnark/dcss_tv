@@ -15,9 +15,11 @@ use CSplat::DB qw/open_db fetch_all_games exec_query
 use CSplat::Config qw/$DATA_DIR/;
 use CSplat::Ttyrec qw/$TTYREC_DIR url_file fetch_ttyrecs
                       update_fetched_games fetch_url record_game
-                      clear_cached_urls ttyrec_path/;
+                      clear_cached_urls ttyrec_path is_death_ttyrec
+                      ttyrecs_out_of_time_bounds/;
 use CSplat::Xlog qw/xlog_line desc_game/;
-use CSplat::Select qw/interesting_game/;
+use CSplat::Select qw/interesting_game is_blacklisted/;
+use CSplat::Seek qw/tty_frame_offset/;
 
 # Overall strategy:
 # * Fetch logfiles.
@@ -142,6 +144,10 @@ sub sanity_check {
       ||
         sanity_check_pred($g, is_blacklisted($g),
                           "Game is blacklisted");
+
+    # Find and save the offset and frame into this ttyrec where
+    # playback starts.
+    tty_frame_offset($g, 1);
   }
   print "\n";
 }
@@ -180,40 +186,6 @@ sub delete_game {
 
 sub check_dirs {
   mkpath( [ $DATA_DIR, $TTYREC_DIR ] );
-}
-
-sub create_tables {
-  my $dbh = shift;
-  print "Setting up splat database\n";
-
-  my @ddl_lines = (
-                   <<'T1',
-  CREATE TABLE logplace (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     logfile TEXT,
-     offset INTEGER
-  );
-T1
-                   <<'T2',
-  CREATE INDEX loff ON logplace (logfile, offset);
-T2
-                   <<'T3',
-  CREATE TABLE ttyrec (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     logrecord TEXT,
-     ttyrecs TEXT
-  );
-T3
-                   <<'T4',
-  CREATE TABLE played_games (
-     ref_id INTEGER,
-     FOREIGN KEY (ref_id) REFERENCES ttyrec (id)
-  );
-T4
-                   );
-  for my $line (@ddl_lines) {
-    $dbh->do($line) or die "Can't create table schema!";
-  }
 }
 
 sub log_path {
@@ -263,6 +235,9 @@ sub trawl_games {
                        record_game($game) if $good_game;
                        record_log_place($log, $game)
                      });
+
+      # This is time consuming, so don't do it for every game.
+      tty_frame_offset($game, 1);
 
       if (!(++$lines % 100)) {
         my $total = $games + $existing_games;

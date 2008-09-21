@@ -10,23 +10,19 @@ use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
                   clear_played_games query_one/;
 use CSplat::Xlog qw/desc_game desc_game_brief xlog_line/;
 use CSplat::Ttyrec qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ ttyrec_path
-                      ttyrec_file_time tty_time/;
+                      ttyrec_file_time tty_time tv_frame_strip/;
 use CSplat::Select qw/filter_matches/;
-use Term::VT102;
+use CSplat::Seek qw/tty_frame_offset clear_screen/;
 use Term::TtyRec::Plus;
 use IO::Socket::INET;
 use Date::Manip;
+use Fcntl qw/SEEK_SET/;
 
 use threads;
 use threads::shared;
 
 # An appropriately Crawlish number.
 my $PLAYLIST_SIZE = 9;
-
-# A standard VT102 to grab frames from.
-my $TERM_X = 80;
-my $TERM_Y = 24;
-my $TERM = Term::VT102->new(cols => $TERM_X, rows => $TERM_Y);
 
 # Socket for splat requests.
 my $REQUEST_HOST = 'crawl.akrasiac.org';
@@ -139,59 +135,6 @@ sub tv_game_exists {
   query_one("SELECT COUNT(*) FROM ttyrec WHERE id = ?", $g->{id})
 }
 
-sub clear_screen {
-  "\e[2J"
-}
-
-sub tv_cache_reset {
-  $TERM->process(clear_screen());
-  # Go to first row and reset attributes.
-  $TERM->process("\e[1H\e[0m");
-}
-
-sub tv_cache_frame {
-  $TERM->process($_[0]);
-}
-
-sub tv_chattr_s {
-  my $attr = shift;
-  my ($fg, $bg, $bo, $fa, $st, $ul, $bl, $rv) = $TERM->attr_unpack($attr);
-
-  my @attr;
-  push @attr, 1 if $bo || $st;
-  push @attr, 2 if $fa;
-  push @attr, 4 if $ul;
-  push @attr, 5 if $bl;
-  push @attr, 7 if $rv;
-
-  my $attrs = @attr? join(';', @attr) . ';' : '';
-  "\e[0;${attrs}3$fg;4${bg}m"
-}
-
-# Return the current term contents as a single frame that can be written
-# to a terminal.
-sub tv_frame {
-  my $frame = "\e[2J\e[0m";
-  my $lastattr = '';
-  for my $row (1 .. $TERM_Y) {
-    my $text = $TERM->row_plaintext($row);
-    my $tattr = $TERM->row_attr($row);
-    next unless $text =~ /[^ ]/;
-    $frame .= "\e[${row}H";
-    for (my $i = 0; $i < $TERM_X; ++$i) {
-      my $attr = substr($tattr, $i * 2, 2);
-      $frame .= tv_chattr_s($attr) if $attr ne $lastattr;
-      $frame .= substr($text, $i, 1);
-      $lastattr = $attr;
-    }
-  }
-
-  my ($x, $y, $attr) = $TERM->status();
-  $frame .= "\e[$y;${x}H";
-  $frame .= tv_chattr_s($attr) unless $attr eq $lastattr;
-
-  $frame
-}
 
 sub tv_show_playlist {
   my ($rplay, $prev) = @_;
@@ -331,26 +274,23 @@ sub server_connect {
 sub tv_play {
   my $g = shift;
 
-  my $sz = $g->{sz};
-  my $skipsize = 0;
-  if ($sz > $TTYRDEFSZ) {
-    $skipsize = $sz - $TTYRDEFSZ;
-  }
+  my ($ttr, $offset, $frame) = tty_frame_offset($g);
 
+  print clear_screen();
+  my $skipping = 1;
   for my $ttyrec (split / /, $g->{ttyrecs}) {
-    my $thisz = -s(ttyrec_path($g, $ttyrec));
-    if ($skipsize >= $thisz) {
-      $skipsize -= $thisz;
-      $sz -= $thisz;
-      next;
+    if ($skipping) {
+      next if $ttr ne $ttyrec;
+      undef $skipping;
     }
 
     eval {
-      tv_play_ttyrec($g, $ttyrec, $sz, $skipsize);
+      tv_play_ttyrec($g, $ttyrec, $offset, $frame);
     };
-    $skipsize = 0;
-    $sz -= $thisz;
-    warn "$@\n" if $@;
+    die "$@\n" if $@;
+
+    undef $offset;
+    undef $frame;
   }
 }
 
@@ -377,25 +317,6 @@ sub check_watchers {
   }
 }
 
-sub tv_frame_strip {
-  my $rdat = shift;
-
-  # Strip IBM graphics, kthx.
-  $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
-
-  # Strip unicode. Rather pricey :(
-  $rdat =~ s/\xe2\x96\x92/#/g;
-  $rdat =~ s/\xe2\x96\x91/*/g;
-  $rdat =~ s/\xc2\xb7/./g;
-  $rdat =~ s/\xe2\x97\xa6/,/g;
-  $rdat =~ s/\xe2\x97\xbc/+/g;
-  $rdat =~ s/\xe2\x88\xa9/\\/g;
-  $rdat =~ s/\xe2\x8c\xa0/}/g;
-  $rdat =~ s/\xe2\x89\x88/{/g;
-
-  $rdat
-}
-
 sub delta_seconds {
   my $delta = shift;
   Delta_Format($delta, 0, "%sh")
@@ -413,87 +334,24 @@ sub calc_perc {
 }
 
 sub tv_play_ttyrec {
-  my ($g, $ttyrec, $total_size, $skip, $buildup_from) = @_;
+  my ($g, $ttyrec, $offset, $frame) = @_;
 
   my $ttyfile = ttyrec_path($g, $ttyrec);
   server_connect();
 
-  my $size = -s $ttyfile;
-  my $skipsize = 0;
-
-  if ($skip) {
-    $skipsize = $skip if $skip > 0 && $skip < $size;
-    my $perc = calc_perc($skipsize, $total_size);
-    warn "\nNeed to skip $skipsize of $total_size ($perc) bytes\n" if $skipsize;
-  }
+  print $SOCK $frame if $frame;
 
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
                                   time_threshold => 3);
-  my $ttyrec_time = ttyrec_file_time($ttyfile);
-  my $end_time = tty_time($g, 'end');
-
-  my $delta = delta_seconds(DateCalc($ttyrec_time, $end_time));
-  my $fc = 0;
-  my $lastclear = 0;
-  my $lastgoodclear = 0;
-
-  tv_cache_reset();
-
-  warn "Building up from $buildup_from\n" if $buildup_from;
-  my $buildupbegun;
+  seek($t->filehandle(), $offset, SEEK_SET) if $offset;
   while (my $fref = $t->next_frame()) {
-    if ($skipsize) {
-      my $pos = tell($t->filehandle());
-      my $hasclear = index($fref->{data}, "\033[2J") > -1;
-      $lastclear = $pos if $hasclear;
-      $lastgoodclear = $pos if $hasclear && $total_size - $pos >= $TTYRMINSZ;
-
-      if ($buildup_from && $pos >= $buildup_from) {
-        tv_cache_frame(tv_frame_strip($fref->{data}));
-      }
-
-      next if $pos < $skipsize;
-
-      if ($hasclear) {
-        my $size_left = $total_size - $pos;
-        if ($size_left < $TTYRMINSZ && $lastgoodclear < $pos
-            && $total_size - $lastgoodclear >= $TTYRMINSZ
-            && !$buildup_from)
-        {
-          warn "Not enough of ttyrec left at $pos, ",
-                "cache-rewinding from $lastgoodclear\n";
-          close($t->filehandle());
-          return tv_play_ttyrec($g, $ttyrec, $total_size,
-                                $skipsize, $lastgoodclear);
-        }
-
-        undef $skipsize;
-        my $perc = calc_perc($pos, $total_size);
-        warn "Done skip at $pos of $total_size ($perc), ",
-          "starting normal playback\n";
-        warn "Size left: $size_left, min: $TTYRMINSZ\n";
-      } else {
-        # If we've been building up a frame in our VT102, spit that out now.
-        if ($buildup_from && $buildup_from < $pos) {
-          warn "Done skip, writing buffer!\n";
-          print $SOCK tv_frame();
-          undef $skipsize;
-        }
-        next;
-      }
-    }
     select undef, undef, undef, $fref->{diff};
     print $SOCK tv_frame_strip($fref->{data});
     select undef, undef, undef, 1 if is_death_frame($fref->{data});
   }
-
   close($t->filehandle());
-
-  if ($skipsize) {
-    tv_play_ttyrec($g, $ttyrec, $lastclear);
-  }
 }
 
 open_db();

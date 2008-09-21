@@ -9,7 +9,8 @@ use base 'Exporter';
 our @EXPORT_OK = qw/%PLAYED_GAMES exec_query exec_do exec_all
                     in_transaction query_one open_db
                     load_played_games fetch_all_games record_played_game
-                    clear_played_games purge_log_offsets/;
+                    clear_played_games purge_log_offsets
+                    tty_find_frame_offset tty_save_frame_offset/;
 
 use CSplat::Xlog qw/xlog_line/;
 
@@ -91,9 +92,68 @@ sub close_db {
   }
 }
 
+sub create_tables {
+  my $dbh = shift;
+  print "Setting up splat database\n";
+
+  my @ddl_lines = (
+                   <<'T1',
+  CREATE TABLE logplace (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     logfile TEXT,
+     offset INTEGER
+  );
+T1
+                   <<'T2',
+  CREATE INDEX loff ON logplace (logfile, offset);
+T2
+                   <<'T3',
+  CREATE TABLE ttyrec (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     logrecord TEXT,
+     ttyrecs TEXT
+  );
+T3
+                   <<'T4',
+  CREATE TABLE played_games (
+     ref_id INTEGER,
+     FOREIGN KEY (ref_id) REFERENCES ttyrec (id)
+  );
+T4
+                   <<'T5',
+  CREATE TABLE ttyrec_offset (
+     id INTEGER UNIQUE,
+     ttyrec TEXT,
+     offset INTEGER,
+     frame BLOB,
+     FOREIGN KEY (id) REFERENCES ttyrec (id)
+  );
+T5
+                   );
+  for my $line (@ddl_lines) {
+    $dbh->do($line) or die "Can't create table schema!";
+  }
+}
+
 sub reopen_db {
   close_db();
   open_db();
+}
+
+sub tty_find_frame_offset {
+  my $g = shift;
+  my $st = exec_query("SELECT ttyrec, offset, frame FROM ttyrec_offset
+                       WHERE id = ?", $g->{id});
+  my $row = $st->fetchrow_arrayref();
+  $row ? @$row : (undef, undef, undef)
+}
+
+sub tty_save_frame_offset {
+  my ($g, $ttr, $offset, $frame) = @_;
+  exec_do("DELETE FROM ttyrec_offset WHERE id = ?", $g->{id});
+  exec_query("INSERT INTO ttyrec_offset (id, ttyrec, offset, frame)
+              VALUES (?, ?, ?, ?)",
+             $g->{id}, $ttr, $offset, $frame);
 }
 
 sub fetch_all_games {
