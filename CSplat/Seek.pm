@@ -120,9 +120,7 @@ sub tty_calc_offset_in {
 sub frame_full_hp {
   my $line = $TERM->row_plaintext(3);
   if ($line =~ m{(?:HP|Health): (\d+)/(\d+) }) {
-    if ($1 >= $2 * 85 / 100) {
-      return (2, $1, $2) if $1 >= $2 * 85 / 100;
-    }
+    return (2, $1, $2) if $1 >= $2 * 85 / 100;
     return (1, $1, $2);
   }
   (undef, undef, undef)
@@ -171,7 +169,7 @@ sub tty_find_offset_deep {
 
     $lastclear = $prev_frame if $hasclear;
     $lastgoodclear = $prev_frame
-      if $hasclear && ($tsz - $pos) <= $TTYRDEFSZ * 2;
+      if $hasclear && ($tsz - $pos) <= $TTYRDEFSZ * 3;
 
     $building = 1 if !$building && defined $lastgoodclear;
 
