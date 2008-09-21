@@ -150,7 +150,7 @@ sub tty_find_frame_offset {
 
 sub tty_save_frame_offset {
   my ($g, $ttr, $offset, $frame) = @_;
-  exec_do("DELETE FROM ttyrec_offset WHERE id = ?", $g->{id});
+  exec_query("DELETE FROM ttyrec_offset WHERE id = ?", $g->{id});
   exec_query("INSERT INTO ttyrec_offset (id, ttyrec, offset, frame)
               VALUES (?, ?, ?, ?)",
              $g->{id}, $ttr, $offset, $frame);
