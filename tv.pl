@@ -29,7 +29,7 @@ my $TERM_Y = 24;
 my $TERM = Term::VT102->new(cols => $TERM_X, rows => $TERM_Y);
 
 # Socket for splat requests.
-my $REQUEST_HOST = 'localhost';  # 'crawl.akrasiac.org';
+my $REQUEST_HOST = 'crawl.akrasiac.org';
 my $REQUEST_PORT = 21976;
 my $RSOCK;
 my $request_buf;
