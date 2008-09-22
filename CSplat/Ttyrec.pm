@@ -191,7 +191,7 @@ sub fetch_ttyrecs {
 
   # Check if we already have the game.
   if (game_was_fetched($g)) {
-    print "Skipping already fetched game: ", desc_game($g), "\n";
+    #print "Skipping already fetched game: ", desc_game($g), "\n";
     return;
   }
 
