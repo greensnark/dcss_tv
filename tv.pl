@@ -183,6 +183,7 @@ sub find_requested_games {
   for my $gameline (split /\n/, $games) {
     next unless $gameline;
     my $g = xlog_line($gameline);
+    delete $g->{start} if $g->{start} gt $g->{end};
     warn "Looking for games matching $gameline\n";
     push(@games, grep(filter_matches($g, $_), @ALLGAMES));
   }
