@@ -14,7 +14,7 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ $TTYREC_DIR
 
 use CSplat::Config qw/$DATA_DIR $UTC_EPOCH server_field game_server/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str/;
-use CSplat::DB qw/fetch_all_games exec_query in_transaction/;
+use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
@@ -164,6 +164,8 @@ sub record_game {
   exec_query("INSERT INTO ttyrec (logrecord, ttyrecs)
               VALUES (?, ?)",
              xlog_str($game), $game->{ttyrecs});
+  my $id = last_row_id();
+  $game->{id} = $id;
 }
 
 sub record_fetched_game {
