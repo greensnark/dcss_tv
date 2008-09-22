@@ -144,3 +144,5 @@ sub _interesting_game {
 
   $good
 }
+
+1
