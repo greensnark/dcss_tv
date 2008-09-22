@@ -25,7 +25,7 @@ use threads::shared;
 my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
-my $REQUEST_HOST = 'crawl.akrasiac.org';
+my $REQUEST_HOST = 'localhost';
 my $REQUEST_PORT = 21976;
 my $RSOCK;
 my $request_buf;
@@ -83,6 +83,26 @@ sub pick_random_unplayed {
   $game
 }
 
+# If there's more than one waiting request from one nick, take only the last
+# request.
+sub squash_splat_requests {
+  my $pref = shift;
+  my @requests = grep($_->{req}, @$pref);
+
+  if (@requests) {
+    my $orig = scalar(@requests);
+    my %dupes;
+    @requests = reverse(grep(!$dupes{$_->{req}}++, reverse(@requests)));
+
+    my %ids;
+    $ids{$_->{id}} = 1 for @requests;
+
+    if (@requests < $orig) {
+      @$pref = grep(!$_->{req} || $ids{$_->{id}}, @$pref);
+    }
+  }
+}
+
 sub build_playlist {
   my $pref = shift;
 
@@ -92,15 +112,14 @@ sub build_playlist {
   my @requested_games = get_requested_games();
 
   if (@requested_games) {
-    # Note that this game is a request.
-    $_->{req} = 'y' for @requested_games;
-
     # Any requested games go to the top of the playlist.
     unshift @$pref, @requested_games;
 
     # And then we eliminate duplicates.
     my %ids;
     @$pref = grep(!$ids{$_->{id}}++, @$pref);
+
+    squash_splat_requests($pref);
   }
 
   # Strip games that were in the playlist, but went awol while we were
@@ -180,12 +199,16 @@ sub find_requested_games {
   my $games = shift;
 
   my @games;
-  for my $gameline (split /\n/, $games) {
-    next unless $gameline;
-    my $g = xlog_line($gameline);
+
+  my @requests = map(xlog_line($_), grep(/\S/, split(/\n/, $games)));
+
+  for my $g (@requests) {
     delete $g->{start} if $g->{start} gt $g->{end};
-    warn "Looking for games matching $gameline\n";
-    push(@games, grep(filter_matches($g, $_), @ALLGAMES));
+    warn "Looking for games matching ", xlog_str($g), "\n";
+
+    my @matches = grep(filter_matches($g, $_), @ALLGAMES);
+    $_->{req} = $g->{req} for @matches;
+    push(@games, @matches);
   }
 
   # Toss duplicate requests.
