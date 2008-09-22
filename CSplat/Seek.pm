@@ -13,6 +13,7 @@ use CSplat::Xlog qw/desc_game_brief/;
 use Term::VT102::Boundless;
 use Term::TtyRec::Plus;
 use Fcntl qw/SEEK_SET/;
+use Carp;
 
 # A standard VT102 to grab frames from.
 my $TERM_X = 80;
@@ -102,7 +103,7 @@ sub tty_calc_frame_offset {
 
     return tty_calc_offset_in($g, $deep, $ttyrec, $sz, $skipsize);
   }
-  die "Argh, wtf?\n";
+  confess "Argh, wtf?\n";
   # WTF?
   (undef, undef, undef)
 }

@@ -237,7 +237,7 @@ sub trawl_games {
                      });
 
       # This is time consuming, so don't do it for every game.
-      tty_frame_offset($game, 1);
+      tty_frame_offset($game, 1) if $good_game;
 
       if (!(++$lines % 100)) {
         my $total = $games + $existing_games;
