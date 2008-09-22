@@ -85,8 +85,8 @@ sub desc_game_brief {
   my $text = join("  ", @pieces);
   $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
 
-  if (($g->{req} || '') eq 'y') {
-    my $suffix = " (req)";
+  if ($g->{req}) {
+    my $suffix = " (r:$g->{req})";
     my $rlen = length($suffix);
     $text = pad($MAX_WIDTH - $rlen, $text) . $suffix
   }

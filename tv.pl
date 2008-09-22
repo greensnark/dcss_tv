@@ -8,7 +8,7 @@ use CSplat::Config qw/game_server/;
 use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
                   fetch_all_games record_played_game
                   clear_played_games query_one/;
-use CSplat::Xlog qw/desc_game desc_game_brief xlog_line/;
+use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
 use CSplat::Ttyrec qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ ttyrec_path
                       ttyrec_file_time tty_time tv_frame_strip/;
 use CSplat::Select qw/filter_matches/;
@@ -25,7 +25,7 @@ use threads::shared;
 my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
-my $REQUEST_HOST = 'localhost';
+my $REQUEST_HOST = 'crawl.akrasiac.org';
 my $REQUEST_PORT = 21976;
 my $RSOCK;
 my $request_buf;
@@ -201,12 +201,19 @@ sub find_requested_games {
   my @games;
 
   my @requests = map(xlog_line($_), grep(/\S/, split(/\n/, $games)));
+  warn "Got ", scalar(@requests), " new requests\n";
 
   for my $g (@requests) {
     delete $g->{start} if $g->{start} gt $g->{end};
     warn "Looking for games matching ", xlog_str($g), "\n";
 
+    my $req = $g->{req};
+    delete $g->{req};
     my @matches = grep(filter_matches($g, $_), @ALLGAMES);
+    $g->{req} = $req;
+
+    warn "Found ", scalar(@matches), " games for request: ", xlog_str($g), "\n";
+
     $_->{req} = $g->{req} for @matches;
     push(@games, @matches);
   }
@@ -237,8 +244,8 @@ sub check_splat_requests {
         chomp $g;
         {
           lock($t_requested_games);
-          warn "Request: $g\n";
           $t_requested_games .= "$g\n";
+          warn "Request: $g\n";
         }
       }
     }
