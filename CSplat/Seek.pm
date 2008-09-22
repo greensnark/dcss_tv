@@ -127,7 +127,7 @@ sub tty_calc_offset_in {
 
 sub frame_full_hp {
   my $line = $TERM->row_plaintext(3);
-  if ($line =~ m{(?:HP|Health): (\d+)/(\d+) }) {
+  if ($line =~ m{(?:HP|Health): (\d+)/(\d+) } && $1 <= $2) {
     return (2, $1, $2) if $1 >= $2 * 85 / 100;
     return (1, $1, $2);
   }
