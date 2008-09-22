@@ -246,7 +246,7 @@ sub trawl_games {
     my $fh = seek_log($log);
     while (my $game = read_log($fh, $log)) {
 
-      my $good_game = interesting_game($game) && fetch_ttyrecs($game);
+      my $good_game = interesting_game($game, 1) && fetch_ttyrecs($game);
       $games++ if $good_game;
 
       in_transaction(sub {

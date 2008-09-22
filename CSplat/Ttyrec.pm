@@ -53,6 +53,7 @@ sub ttyrecs_out_of_time_bounds {
   my $g = shift;
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
+
   for my $tty (split / /, $g->{ttyrecs}) {
     if (!ttyrec_between($tty, $start, $end)) {
       warn "ttyrec is not between $start and $end: ", $tty, "\n";
@@ -296,7 +297,7 @@ sub ttyrec_file_time {
 sub ttyrec_between {
   my ($tty, $start, $end) = @_;
   my $pdate = ttyrec_file_time( $tty );
-  $pdate ge $start && $pdate le $end
+  ($pdate le $end) && (!$start || $pdate ge $start)
 }
 
 sub ttyrec_path {
