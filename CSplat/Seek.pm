@@ -4,7 +4,7 @@ use warnings;
 package CSplat::Seek;
 use base 'Exporter';
 
-our @EXPORT_OK = qw/tty_frame_offset clear_screen/;
+our @EXPORT_OK = qw/tty_frame_offset clear_screen set_buildup_size/;
 
 use CSplat::DB qw/tty_find_frame_offset tty_save_frame_offset/;
 use CSplat::Ttyrec qw/ttyrec_path $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
@@ -19,6 +19,13 @@ use Carp;
 my $TERM_X = 80;
 my $TERM_Y = 24;
 my $TERM = Term::VT102::Boundless->new(cols => $TERM_X, rows => $TERM_Y);
+
+my $BUILDUP_SIZE = $TTYRDEFSZ * 3;
+
+sub set_buildup_size {
+  my $sz = shift;
+  $BUILDUP_SIZE = $TTYRDEFSZ * ($sz || 3);
+}
 
 sub clear_screen {
   "\e[2J"
@@ -170,7 +177,7 @@ sub tty_find_offset_deep {
 
     $lastclear = $prev_frame if $hasclear;
     $lastgoodclear = $prev_frame
-      if $hasclear && ($tsz - $pos) <= $TTYRDEFSZ * 3;
+      if $hasclear && ($tsz - $pos) <= $BUILDUP_SIZE;
 
     $building = 1 if !$building && defined $lastgoodclear;
 
@@ -180,8 +187,7 @@ sub tty_find_offset_deep {
       tv_cache_frame(tv_frame_strip($fref->{data}));
       my ($type, $hp, $maxhp) = frame_full_hp();
       if ($type
-          && ($type > $best_type || ($type == $best_type && $hp >= $best_hp))
-          && ($tsz - $pos) <= $TTYRDEFSZ * 6)
+          && ($type > $best_type || ($type == $best_type && $hp >= $best_hp)))
       {
         $best_type = $type;
         $best_hp = $hp;

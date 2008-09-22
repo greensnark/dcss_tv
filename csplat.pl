@@ -11,15 +11,16 @@ use Getopt::Long;
 use Fcntl qw/SEEK_SET/;
 
 use CSplat::DB qw/open_db fetch_all_games exec_query
-                  query_one in_transaction purge_log_offsets/;
+                  query_one in_transaction purge_log_offsets
+                  tty_delete_frame_offset/;
 use CSplat::Config qw/$DATA_DIR/;
 use CSplat::Ttyrec qw/$TTYREC_DIR url_file fetch_ttyrecs
                       update_fetched_games fetch_url record_game
                       clear_cached_urls ttyrec_path is_death_ttyrec
                       ttyrecs_out_of_time_bounds/;
 use CSplat::Xlog qw/xlog_line desc_game/;
-use CSplat::Select qw/interesting_game is_blacklisted/;
-use CSplat::Seek qw/tty_frame_offset/;
+use CSplat::Select qw/interesting_game is_blacklisted filter_matches/;
+use CSplat::Seek qw/tty_frame_offset set_buildup_size/;
 
 # Overall strategy:
 # * Fetch logfiles.
@@ -48,7 +49,8 @@ my %opt;
 
 # Fetch mode by default.
 GetOptions(\%opt, 'rescan', 'local', 'migrate',
-           'sanity-check', 'sanity-fix');
+           'sanity-check', 'sanity-fix', 'filter=s',
+           're-seek=f');
 
 sub seek_log {
   my $url = shift;
@@ -121,6 +123,17 @@ sub rescan_games {
 # will also delete games that have no death ttyrecs.
 sub sanity_check {
   my @games = fetch_all_games();
+
+  if ($opt{filter}) {
+    my $filter = xlog_line($opt{filter});
+    @games = grep(filter_matches($filter, $_), @games);
+  }
+
+  if ($opt{'re-seek'}) {
+    my $off = $opt{'re-seek'};
+    set_buildup_size($off);
+  }
+
   print "Running sanity-check";
   print ", will fix errors." if $opt{'sanity-fix'};
   print "\n";
@@ -144,6 +157,10 @@ sub sanity_check {
       ||
         sanity_check_pred($g, is_blacklisted($g),
                           "Game is blacklisted");
+
+    next if $g->{deleted};
+
+    tty_delete_frame_offset($g) if $opt{'re-seek'};
 
     # Find and save the offset and frame into this ttyrec where
     # playback starts.
@@ -182,6 +199,7 @@ sub delete_game {
     }
   }
   exec_query("DELETE FROM ttyrec WHERE id = ?", $g->{id});
+  $g->{deleted} = 'y';
 }
 
 sub check_dirs {

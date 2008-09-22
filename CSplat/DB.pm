@@ -11,7 +11,7 @@ our @EXPORT_OK = qw/%PLAYED_GAMES exec_query exec_do exec_all
                     load_played_games fetch_all_games record_played_game
                     clear_played_games purge_log_offsets
                     tty_find_frame_offset tty_save_frame_offset
-                    last_row_id/;
+                    tty_delete_frame_offset last_row_id/;
 
 use CSplat::Xlog qw/xlog_line/;
 
@@ -153,9 +153,14 @@ sub tty_find_frame_offset {
   $row ? @$row : (undef, undef, undef)
 }
 
+sub tty_delete_frame_offset {
+  my $g = shift;
+  exec_query("DELETE FROM ttyrec_offset WHERE id = ?", $g->{id});
+}
+
 sub tty_save_frame_offset {
   my ($g, $ttr, $offset, $frame) = @_;
-  exec_query("DELETE FROM ttyrec_offset WHERE id = ?", $g->{id});
+  tty_delete_frame_offset($g);
   exec_query("INSERT INTO ttyrec_offset (id, ttyrec, offset, frame)
               VALUES (?, ?, ?, ?)",
              $g->{id}, $ttr, $offset, $frame);
