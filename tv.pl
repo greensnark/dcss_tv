@@ -320,7 +320,7 @@ sub tv_play {
     eval {
       tv_play_ttyrec($g, $ttyrec, $offset, $frame);
     };
-    die "$@\n" if $@;
+    warn "$@\n" if $@;
 
     undef $offset;
     undef $frame;
