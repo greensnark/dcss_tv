@@ -38,6 +38,7 @@ my %opt;
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'filter=s');
 
+$REQUEST_HOST = 'localhost' if $opt{local};
 
 ############################  TV!  ####################################
 
@@ -241,6 +242,7 @@ sub check_splat_requests {
     if ($RSOCK) {
       while (my $game = <$RSOCK>) {
         my ($g) = $game =~ /^\d+ (.*)/;
+        next unless $g;
         chomp $g;
         {
           lock($t_requested_games);
@@ -307,7 +309,7 @@ sub tv_play {
 
   my ($ttr, $offset, $frame) = tty_frame_offset($g);
 
-  print clear_screen();
+  print $SOCK clear_screen();
   my $skipping = 1;
   for my $ttyrec (split / /, $g->{ttyrecs}) {
     if ($skipping) {

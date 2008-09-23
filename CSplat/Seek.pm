@@ -63,6 +63,7 @@ sub tv_frame {
   my $lastattr = '';
   for my $row (1 .. $TERM->rows()) {
     my $text = $TERM->row_plaintext($row);
+    next unless $text;
     my $tattr = $TERM->row_attr($row);
     next unless $text =~ /[^ ]/;
     $frame .= "\e[${row}H";
