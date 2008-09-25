@@ -31,7 +31,7 @@ our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
 sub game_server {
   my $g = shift;
   my $src = $g->{src};
-  $src = $SERVABBREV{$src} if $src =~ /^\w+/;
+  $src = $SERVABBREV{$src} if $src =~ /^\w+$/;
   my ($server) = $src =~ m{^http://(.*?)/};
   confess "No server in $src\n" unless $server;
   $server
