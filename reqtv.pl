@@ -150,6 +150,7 @@ sub request_tv {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
         $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
+        $TV->write("Please wait, fetching game...\r\n");
       }
 
       if (@queued_playback) {
