@@ -109,7 +109,7 @@ sub fetch_url {
 }
 
 sub download_ttyrecs {
-  my ($g, $no_death_check) = @_;
+  my ($g, $no_checks) = @_;
 
   my $sz = 0;
 
@@ -126,7 +126,7 @@ sub download_ttyrecs {
     push @tofetch, $tty;
   }
 
-  if ($sz > $TTYRMAXSZ || $sz < $TTYRMINSZ) {
+  if ($sz > $TTYRMAXSZ || (!$no_checks && $sz < $TTYRMINSZ)) {
     print "ttyrec total size for " . desc_game($g) .
       " = $sz is out of bounds.\n";
     return;
@@ -143,7 +143,7 @@ sub download_ttyrecs {
   }
 
   # Do we have a ttyrec with "You die..."? If not, discard the lot.
-  unless ($no_death_check || is_death_ttyrec($g, $tofetch[-1]->{u})) {
+  unless ($no_checks || is_death_ttyrec($g, $tofetch[-1]->{u})) {
     for my $ttyrec (@tofetch) {
       unlink ttyrec_path($g, $ttyrec->{u});
     }
