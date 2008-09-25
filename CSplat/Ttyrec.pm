@@ -160,11 +160,14 @@ sub download_ttyrecs {
 
 sub record_game {
   my $game = shift;
+  my $req = $game->{req};
+  delete $game->{req} if $req;
   record_fetched_game($game);
   exec_query("INSERT INTO ttyrec (logrecord, ttyrecs)
               VALUES (?, ?)",
              xlog_str($game), $game->{ttyrecs});
   my $id = last_row_id();
+  $game->{req} = $req;
   $game->{id} = $id;
 }
 

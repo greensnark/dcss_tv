@@ -208,7 +208,7 @@ sub tty_find_offset_deep {
         undef $t;
         $t = Term::TtyRec::Plus->new(infile => $ttyfile,
                                      time_threshold => 3);
-        seek($t->filehandle(), $lastgoodclear || $lastclear, SEEK_SET);
+        seek($t->filehandle(), $lastgoodclear || $lastclear || 0, SEEK_SET);
         $building = 1;
         next;
       }

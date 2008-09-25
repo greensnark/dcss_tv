@@ -25,16 +25,18 @@ sub xlog_line {
 
 sub escape_xlogfield {
   my $field = shift;
-  $field =~ s/:/::/;
+  $field =~ s/:/::/g;
   $field
 }
 
 sub xlog_str {
-  my $xlog = shift;
+  my ($xlog, $full) = @_;
   my %hash = %$xlog;
-  delete $hash{offset};
-  delete $hash{ttyrecs};
-  delete $hash{ttyrecurls};
+  unless ($full) {
+    delete $hash{offset};
+    delete $hash{ttyrecs};
+    delete $hash{ttyrecurls};
+  }
   join(":", map { "$_=@{[ escape_xlogfield($hash{$_}) ]}" } keys(%hash))
 }
 
