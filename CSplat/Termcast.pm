@@ -145,7 +145,7 @@ sub play_game {
     eval {
       $self->play_ttyrec($g, ttyrec_path($g, $ttyrec), $offset, $frame);
     };
-    die "$@\n" if $@;
+    warn "$@\n" if $@;
 
     undef $offset;
     undef $frame;
