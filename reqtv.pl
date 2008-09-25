@@ -68,14 +68,15 @@ sub request_tv {
 
   $TV->clear();
   while (1) {
-    $TV->write("\e[1H");
     if ($last_game) {
-      $TV->write("\e[1;37mThat was:\e[0m\n\e[1;33m");
+      $TV->clear();
+      $TV->write("\e[1H");
+      $TV->write("\e[1;37mThat was:\e[0m\r\n\e[1;33m");
       $TV->write(desc_game_brief($last_game));
       $TV->write("\e[0m\n\n");
     }
     $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
-    $TV->write("\n\n");
+    $TV->write("\r\n\r\n");
 
     my $g;
     do {
@@ -83,11 +84,13 @@ sub request_tv {
     } while ($g->{splat} eq 'y');
 
     clear_cached_urls();
-    $TV->write("Request from $g->{req}:\n", desc_game_brief($g), "\n\n");
+    $TV->write("Request from $g->{req}:\r\n", desc_game_brief($g), "\r\n");
+    $TV->write("Please wait, fetching game...\r\n");
     my $game = get_game_matching($g);
 
     unless ($game) {
-      $TV->write("No games found matching " . xlog_str($g) . "\n");
+      $TV->write("No games found matching " . desc_game($g) . "\r\n");
+      undef $last_game;
     } else {
       $TV->play_game($game);
       $last_game = $game;
