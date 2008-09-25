@@ -210,6 +210,9 @@ sub fetch_ttyrecs {
     return;
   }
 
+  # If no start time, restrict to one ttyrec.
+  @ttyrecs = ($ttyrecs[-1]) unless $start;
+
   $g->{ttyrecs} = join(" ", map($_->{u}, @ttyrecs));
   $g->{ttyrecurls} = \@ttyrecs;
   download_ttyrecs($g, $no_death_check)
@@ -277,7 +280,11 @@ sub tty_tz_time {
 
 sub tty_time {
   my ($g, $which) = @_;
-  my $time = fix_crawl_time($g->{$which});
+
+  my $raw = $g->{$which};
+  return unless $raw;
+
+  my $time = fix_crawl_time($raw);
   (my $stripped = $time) =~ s/[DS]$//;
 
   # First parse it as UTC.

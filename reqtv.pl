@@ -59,10 +59,14 @@ sub get_game_matching {
 sub download_game {
   my $g = shift;
 
-  $g->{start} = $g->{rstart};
+  my $start = $g->{start} = $g->{rstart};
   $g->{end} = $g->{rend};
   warn "Downloading ttyrecs for ", desc_game($g), "\n";
+
+  # Don't use start time when looking for ttyrecs.
+  delete $g->{start};
   return unless fetch_ttyrecs($g, 1);
+  $g->{start} = $start;
   record_game($g);
   tty_frame_offset($g, 1);
   $g
