@@ -24,7 +24,7 @@ use threads::shared;
 
 my %opt;
 
-my @queued_message : shared;
+my @queued_fetch : shared;
 my @queued_playback : shared;
 
 # Fetch mode by default.
@@ -79,10 +79,7 @@ sub next_request {
   } while ($g->{splat} eq 'y');
   clear_cached_urls();
 
-  push @queued_message,
-    "Request from $g->{req}:\r\n" . desc_game_brief($g) . "\r\n" .
-    "Please wait, fetching game...\r\n";
-
+  push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);
   push @queued_playback, xlog_str($game, 1) if $game;
 }
@@ -93,6 +90,37 @@ sub check_requests {
     next_request();
     sleep 1;
   }
+}
+
+sub tv_show_playlist {
+  my ($rplay, $prev) = @_;
+
+  $TV->clear();
+  if ($prev) {
+    $prev = desc_game_brief($prev);
+    $TV->write("\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m");
+  }
+
+  my $pos = 1 + ($prev ? 3 : 0);
+  $TV->write("\e[$pos;1H\e[1;37mComing up:\e[0m");
+  $pos++;
+
+  my $first = 1;
+  my @display = @$rplay;
+  if (@display > $PLAYLIST_SIZE) {
+    @display = @display[0 .. ($PLAYLIST_SIZE - 1)];
+  }
+  for my $game (@display) {
+    # Move to right position:
+    $TV->write("\e[$pos;1H",
+               $first? "\e[1;34m" : "\e[0m",
+               desc_game_brief($game));
+    $TV->write("\e[0m") if $first;
+    undef $first;
+    ++$pos;
+  }
+
+  sleep(5);
 }
 
 sub request_tv {
@@ -107,22 +135,22 @@ sub request_tv {
   $TV->clear();
   while (1) {
     $TV->write("\e[1H");
-    if ($last_game) {
-      $TV->clear();
-      $TV->write("\e[1H");
-      $TV->write("\e[1;37mThat was:\e[0m\r\n\e[1;33m");
-      $TV->write(desc_game_brief($last_game));
-      $TV->write("\e[0m\r\n\r\n");
-    }
 
     $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
     $TV->write("\r\n\r\n");
 
     while (1) {
-      if (@queued_message) {
-        $TV->write(shift @queued_message);
+      if (@queued_playback) {
+        my @copy = map(xlog_line($_), @queued_playback);
+        tv_show_playlist(\@copy, $last_game);
+        sleep 4;
+        last;
       }
-      last if @queued_playback;
+
+      if (@queued_fetch) {
+        my $f = xlog_line(shift(@queued_fetch));
+        print "Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n";
+      }
 
       sleep 1;
     }
