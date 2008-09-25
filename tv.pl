@@ -27,23 +27,19 @@ use threads::shared;
 my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
-my $REQUEST_HOST = 'crawl.akrasiacrasiac.org';
+my $REQUEST_HOST = 'crawl.akrasiac.org';
 my $REQUEST_PORT = 21976;
-
-my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
-                               port => $REQUEST_PORT);
 
 # Games requested for TV.
 my $t_requested_games : shared = '';
 
 my %opt;
-
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'filter=s');
 
 $REQUEST_HOST = 'localhost' if $opt{local};
-
-############################  TV!  ####################################
+my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
+                               port => $REQUEST_PORT);
 
 my $SERVER      = '213.184.131.118'; # termcast server (probably don't change)
 my $PORT        = 31337;             # termcast port (probably don't change)
