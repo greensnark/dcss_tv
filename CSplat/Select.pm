@@ -6,7 +6,8 @@ use base 'Exporter';
 
 use Date::Manip;
 
-our @EXPORT_OK = qw/is_blacklisted interesting_game filter_matches/;
+our @EXPORT_OK = qw/is_blacklisted interesting_game filter_matches
+                    make_filter/;
 
 use CSplat::Config qw/$UTC_BEFORE $UTC_AFTER/;
 use CSplat::Xlog qw/xlog_line desc_game/;
@@ -39,6 +40,27 @@ sub field_mangle {
     $v =~ s/[SD]$//;
   }
   $v
+}
+
+sub make_filter {
+  my $filter = shift;
+  if (ref($filter)) {
+    # Make a copy so we don't mess with the original.
+    $filter = { %$filter };
+  } else {
+    $filter = xlog_line($filter);
+  }
+
+  my @keys = keys %$filter;
+
+  my @goodkeys = qw/name start end god vmsg tmsg place ktyp title
+                    xl char turn/;
+  my %good = map(($_ => 1), @goodkeys);
+
+  for my $key (@keys) {
+    delete @$filter{$key} unless $good{$key};
+  }
+  $filter
 }
 
 sub filter_matches {

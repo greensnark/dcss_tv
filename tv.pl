@@ -11,12 +11,14 @@ use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
 use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
 use CSplat::Ttyrec qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ ttyrec_path
                       ttyrec_file_time tty_time tv_frame_strip/;
-use CSplat::Select qw/filter_matches/;
-use CSplat::Seek qw/tty_frame_offset clear_screen/;
+use CSplat::Select qw/filter_matches make_filter/;
+use CSplat::Seek qw/tty_frame_offset/;
+use CSplat::Termcast;
+use CSplat::Request;
+
 use Term::TtyRec::Plus;
 use IO::Socket::INET;
 use Date::Manip;
-use Fcntl qw/SEEK_SET/;
 
 use threads;
 use threads::shared;
@@ -25,10 +27,11 @@ use threads::shared;
 my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
-my $REQUEST_HOST = 'crawl.akrasiac.org';
+my $REQUEST_HOST = 'crawl.akrasiacrasiac.org';
 my $REQUEST_PORT = 21976;
-my $RSOCK;
-my $request_buf;
+
+my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
+                               port => $REQUEST_PORT);
 
 # Games requested for TV.
 my $t_requested_games : shared = '';
@@ -48,19 +51,13 @@ my $NAME        = 'C_SPLAT';         # name to use on termcast
 my $thres       = 3;                 # maximum sleep secs on a ttyrec frame
 my @ALLGAMES;
 my @TVGAMES;
-my $SOCK;
-my $WATCHERS = 0;
-my $MOST_WATCHERS = 0;
 
 my $PWFILE = 'tv.pwd';
 
-sub read_password {
-  chomp(my $text = do { local @ARGV = $PWFILE; <> });
-  die "No password for termcast login?\n" unless $text;
-  $text
-}
-
-my $PASS = read_password();   # pass to use on termcast
+my $TV = CSplat::Termcast->new(name => $NAME,
+                               passfile => $PWFILE,
+                               local => $opt{local}
+                              );
 
 sub scan_ttyrec_list {
   @TVGAMES = @ALLGAMES = fetch_all_games();
@@ -145,7 +142,7 @@ sub run_tv {
 
     tv_show_playlist(\@playlist, $old);
     $old = shift @playlist;
-    tv_play($old);
+    $TV->play_game($old);
   }
 }
 
@@ -158,15 +155,15 @@ sub tv_game_exists {
 
 sub tv_show_playlist {
   my ($rplay, $prev) = @_;
-  server_connect();
-  print $SOCK clear_screen();
+
+  $TV->clear();
   if ($prev) {
     $prev = desc_game_brief($prev);
-    print $SOCK "\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m";
+    $TV->write("\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m");
   }
 
   my $pos = 1 + ($prev ? 3 : 0);
-  print $SOCK "\e[$pos;1H\e[1;37mComing up:\e[0m";
+  $TV->write("\e[$pos;1H\e[1;37mComing up:\e[0m");
   $pos++;
 
   my $first = 1;
@@ -176,24 +173,15 @@ sub tv_show_playlist {
   }
   for my $game (@display) {
     # Move to right position:
-    print $SOCK "\e[$pos;1H";
-    print $SOCK $first? "\e[1;34m" : "\e[0m";
-    print $SOCK desc_game_brief($game);
-    print $SOCK "\e[0m" if $first;
+    $TV->write("\e[$pos;1H",
+               $first? "\e[1;34m" : "\e[0m",
+               desc_game_brief($game));
+    $TV->write("\e[0m") if $first;
     undef $first;
     ++$pos;
   }
 
   sleep(5);
-}
-
-# Connect to splat request server.
-sub connect_splat_request {
-  #print "Connecting to splat request server.\n";
-  $RSOCK = IO::Socket::INET->new(PeerAddr => $REQUEST_HOST,
-                                 PeerPort => $REQUEST_PORT,
-                                 Type => SOCK_STREAM,
-                                 Timeout => 30);
 }
 
 sub find_requested_games {
@@ -208,10 +196,8 @@ sub find_requested_games {
     delete $g->{start} if $g->{start} gt $g->{end};
     warn "Looking for games matching ", xlog_str($g), "\n";
 
-    my $req = $g->{req};
-    delete $g->{req};
-    my @matches = grep(filter_matches($g, $_), @ALLGAMES);
-    $g->{req} = $req;
+    my $filter = make_filter($g);
+    my @matches = grep(filter_matches($filter, $_), @ALLGAMES);
 
     warn "Found ", scalar(@matches), " games for request: ", xlog_str($g), "\n";
 
@@ -237,22 +223,15 @@ sub get_requested_games {
 }
 
 sub check_splat_requests {
-  while (1) {
-    connect_splat_request() unless $RSOCK;
-    if ($RSOCK) {
-      while (my $game = <$RSOCK>) {
-        my ($g) = $game =~ /^\d+ (.*)/;
-        next unless $g;
-        chomp $g;
-        {
-          lock($t_requested_games);
-          $t_requested_games .= "$g\n";
-          warn "Request: $g\n";
-        }
-      }
+  while (my $game = $REQ->next_request_line()) {
+    my ($g) = $game =~ /^\d+ (.*)/;
+    next unless $g;
+    chomp $g;
+    {
+      lock($t_requested_games);
+      $t_requested_games .= "$g\n";
+      warn "Request: $g\n";
     }
-    undef $RSOCK;
-    sleep 3;
   }
 }
 
@@ -261,130 +240,15 @@ sub run_splat_request_thread {
   $t->detach;
 }
 
-# Reconnect (or connect) to the termcast server and do the handshake.
-# Returns () if an error occurred (such as not being able to connect)
-# Otherwise returns the socket, which is ready to accept ttyrec frame data.
-sub server_reconnect {
-  my ($server, $port, $name, $pass) = @_;
-
-  return if defined $SOCK;
-
-  print "Attempting to connect...\n";
-
-  $SOCK = IO::Socket::INET->new(PeerAddr => "$server:$port",
-                                Proto    => 'tcp',
-                                Type => SOCK_STREAM);
-  die "Unable to connect: $!\n" unless defined $SOCK;
-  return unless defined($SOCK);
-
-  print "Trying to send handshake...\n";
-  # Try to send the handshake
-  print $SOCK "hello $name $pass\n";
-
-  my $response = <$SOCK>;
-  die "Bad response from server: $response ($!)\n"
-    unless $response and $response =~ /^hello, $name\s*$/;
-
-  print "Connected!\n";
-
-  $SOCK
-}
-
-sub server_connect {
-  if ($opt{local}) {
-    $SOCK = \*STDOUT;
-    $SOCK->autoflush;
-    return $SOCK;
-  }
-  while (!defined($SOCK)) {
-    server_reconnect($SERVER, $PORT, $NAME, $PASS);
-    last if defined $SOCK;
-    print "Unable to connect, trying again in 10s...\n";
-    sleep 10;
-  }
-}
-
-sub tv_play {
-  my $g = shift;
-
-  my ($ttr, $offset, $frame) = tty_frame_offset($g);
-
-  print $SOCK clear_screen();
-  my $skipping = 1;
-  for my $ttyrec (split / /, $g->{ttyrecs}) {
-    if ($skipping) {
-      next if $ttr ne $ttyrec;
-      undef $skipping;
-    }
-
-    eval {
-      tv_play_ttyrec($g, $ttyrec, $offset, $frame);
-    };
-    warn "$@\n" if $@;
-
-    undef $offset;
-    undef $frame;
-  }
-}
-
-sub check_watchers {
-  my $sock_out = <$SOCK>;
-  if (defined($sock_out)) {
-    chomp $sock_out;
-    if ($sock_out eq 'msg watcher connected') {
-      ++$WATCHERS;
-      print "New watcher! Up to $WATCHERS.";
-      if ($WATCHERS > $MOST_WATCHERS) {
-        $MOST_WATCHERS = $WATCHERS;
-        print " That's a new record since this session has started!";
-      }
-      print "\n";
-    }
-    elsif ($sock_out eq 'msg watcher disconnected') {
-      --$WATCHERS;
-      print "Lost a watcher. Down to $WATCHERS.\n";
-    }
-    else { # Don't know how to handle it, so just echo
-      print ">> $sock_out\n";
-    }
-  }
-}
-
 sub delta_seconds {
   my $delta = shift;
   Delta_Format($delta, 0, "%sh")
-}
-
-sub is_death_frame {
-  my $frame = shift;
-  $frame =~ /You die\.\.\./;
 }
 
 sub calc_perc {
   my ($num, $den) = @_;
   return "0.0" if $den == 0;
   sprintf "%.2f%%", ($num * 100 / $den)
-}
-
-sub tv_play_ttyrec {
-  my ($g, $ttyrec, $offset, $frame) = @_;
-
-  my $ttyfile = ttyrec_path($g, $ttyrec);
-  server_connect();
-
-  print $SOCK $frame if $frame;
-
-  warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
-
-  my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
-                                  time_threshold => 3);
-  seek($t->filehandle(), $offset, SEEK_SET) if $offset;
-  while (my $fref = $t->next_frame()) {
-    select undef, undef, undef, $fref->{diff};
-    print $SOCK tv_frame_strip($fref->{data});
-    select undef, undef, undef, 1 if is_death_frame($fref->{data});
-  }
-  close($t->filehandle());
 }
 
 open_db();

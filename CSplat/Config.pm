@@ -24,10 +24,13 @@ our %SERVMAP =
    'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
                            ttypath => 'http://crawl.develz.org/ttyrecs' });
 
+our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
+                   cdo => 'http://crawl.develz.org/');
 
 sub game_server {
   my $g = shift;
   my $src = $g->{src};
+  $src = $SERVABBREV{$src} if $src =~ /^\w+/;
   my ($server) = $src =~ m{^http://(.*?)/};
   confess "No server in $src\n" unless $server;
   $server

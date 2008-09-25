@@ -52,6 +52,9 @@ sub desc_game {
   $place = "a Bazaar" if $place eq 'Bzr';
   $place = "Pandemonium" if $place eq 'Pan';
   $place = " $prep $place";
+
+  $place = '' if $ktyp eq 'winning' || $ktyp eq 'leaving';
+
   my $when = " on " . fix_crawl_time($g->{end});
 
   "$g->{name} the $g->{title} (L$g->{xl} $g->{char})$god, $dmsg$place$when, " .

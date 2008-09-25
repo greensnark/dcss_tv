@@ -110,7 +110,7 @@ sub fetch_url {
 }
 
 sub download_ttyrecs {
-  my $g = shift;
+  my ($g, $no_death_check) = @_;
 
   my $sz = 0;
 
@@ -144,7 +144,7 @@ sub download_ttyrecs {
   }
 
   # Do we have a ttyrec with "You die..."? If not, discard the lot.
-  unless (is_death_ttyrec($g, $tofetch[-1]->{u})) {
+  unless ($no_death_check || is_death_ttyrec($g, $tofetch[-1]->{u})) {
     for my $ttyrec (@tofetch) {
       unlink ttyrec_path($g, $ttyrec->{u});
     }
@@ -187,11 +187,10 @@ sub game_was_fetched {
 }
 
 sub fetch_ttyrecs {
-  my $g = shift;
+  my ($g, $no_death_check) = @_;
 
   # Check if we already have the game.
   if (game_was_fetched($g)) {
-    #print "Skipping already fetched game: ", desc_game($g), "\n";
     return;
   }
 
@@ -211,7 +210,7 @@ sub fetch_ttyrecs {
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @ttyrecs));
   $g->{ttyrecurls} = \@ttyrecs;
-  download_ttyrecs($g)
+  download_ttyrecs($g, $no_death_check)
 }
 
 sub clean_ttyrec_url {
