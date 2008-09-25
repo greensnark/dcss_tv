@@ -132,10 +132,9 @@ sub request_tv {
   sleep 1;
   open_db();
 
-  $TV->clear();
   while (1) {
+    $TV->clear();
     $TV->write("\e[1H");
-
     $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
     $TV->write("\r\n\r\n");
 
