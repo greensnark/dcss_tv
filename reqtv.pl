@@ -147,16 +147,16 @@ sub request_tv {
     $TV->write("\r\n\r\n");
 
     while (1) {
+      if (@queued_fetch) {
+        my $f = xlog_line(shift(@queued_fetch));
+        $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
+      }
+
       if (@queued_playback) {
         my @copy = map(xlog_line($_), @queued_playback);
         tv_show_playlist(\@copy, $last_game);
         sleep 4;
         last;
-      }
-
-      if (@queued_fetch) {
-        my $f = xlog_line(shift(@queued_fetch));
-        $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
       }
 
       sleep 1;
