@@ -4,7 +4,7 @@ use warnings;
 package CSplat::Config;
 
 use base 'Exporter';
-our @EXPORT_OK = qw/$DATA_DIR %SERVMAP
+our @EXPORT_OK = qw/$DATA_DIR $TTYREC_DIR %SERVMAP
                     $UTC_EPOCH $UTC_BEFORE $UTC_AFTER
                     server_field game_server/;
 
@@ -12,6 +12,7 @@ use Carp;
 use Date::Manip;
 
 our $DATA_DIR = 'data';
+our $TTYREC_DIR = "$DATA_DIR/ttyrecs";
 
 our $UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
 our $UTC_BEFORE = DateCalc($UTC_EPOCH, "-1 days");

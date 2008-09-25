@@ -5,22 +5,21 @@ package CSplat::Ttyrec;
 
 use base 'Exporter';
 
-our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ $TTYREC_DIR
+our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     clear_cached_urls ttyrec_path url_file
                     ttyrec_file_time tty_time fetch_ttyrecs
                     update_fetched_games fetch_url record_game
                     tv_frame_strip is_death_ttyrec
                     ttyrecs_out_of_time_bounds/;
 
-use CSplat::Config qw/$DATA_DIR $UTC_EPOCH server_field game_server/;
+use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
+                      server_field game_server/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
 use File::Path;
-
-our $TTYREC_DIR = "$DATA_DIR/ttyrecs";
 
 # Smallest cumulative length of ttyrec that's acceptable.
 our $TTYRMINSZ = 95 * 1024;

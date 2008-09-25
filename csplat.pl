@@ -12,9 +12,9 @@ use Fcntl qw/SEEK_SET/;
 
 use CSplat::DB qw/open_db fetch_all_games exec_query
                   query_one in_transaction purge_log_offsets
-                  tty_delete_frame_offset/;
-use CSplat::Config qw/$DATA_DIR/;
-use CSplat::Ttyrec qw/$TTYREC_DIR url_file fetch_ttyrecs
+                  tty_delete_frame_offset check_dirs/;
+use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
+use CSplat::Ttyrec qw/url_file fetch_ttyrecs
                       update_fetched_games fetch_url record_game
                       clear_cached_urls ttyrec_path is_death_ttyrec
                       ttyrecs_out_of_time_bounds/;
@@ -79,7 +79,6 @@ sub read_log {
 }
 
 sub fetch {
-  check_dirs();
   update_fetched_games();
   rescan_games() if $opt{rescan};
   while (1) {

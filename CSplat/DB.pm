@@ -11,14 +11,20 @@ our @EXPORT_OK = qw/%PLAYED_GAMES exec_query exec_do exec_all
                     load_played_games fetch_all_games record_played_game
                     clear_played_games purge_log_offsets
                     tty_find_frame_offset tty_save_frame_offset
-                    tty_delete_frame_offset last_row_id/;
+                    tty_delete_frame_offset last_row_id check_dirs/;
 
 use CSplat::Xlog qw/xlog_line/;
+use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
+use File::Path;
 
 my $DBH;
 my $TRAIL_DB = 'data/splat.db';
 
 our %PLAYED_GAMES;  # hash tracking db ids of ttyrecs played
+
+sub check_dirs {
+  mkpath( [ $DATA_DIR, $TTYREC_DIR ] );
+}
 
 sub in_transaction {
   my $sub = shift;
@@ -85,6 +91,7 @@ sub purge_log_offsets {
 }
 
 sub open_db {
+  check_dirs();
   my $size = -s $TRAIL_DB;
   $DBH = DBI->connect("dbi:SQLite:$TRAIL_DB");
   create_tables($DBH) unless defined($size) && $size > 0;
