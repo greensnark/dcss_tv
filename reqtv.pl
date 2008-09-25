@@ -81,7 +81,12 @@ sub next_request {
 
   push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);
-  push @queued_playback, xlog_str($game, 1) if $game;
+  if ($game) {
+    push @queued_playback, xlog_str($game, 1);
+  } else {
+    $g->{failed} = 1;
+    push @queued_fetch, xlog_str($g);
+  }
 }
 
 sub check_requests {
@@ -149,8 +154,13 @@ sub request_tv {
     while (1) {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
-        $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
-        $TV->write("Please wait, fetching game...\r\n");
+        if ($f->{failed}) {
+          $TV->write("Failed to fetch game:\r\n", desc_game_brief($f), "\r\n");
+        }
+        else {
+          $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
+          $TV->write("Please wait, fetching game...\r\n");
+        }
       }
 
       if (@queued_playback) {
