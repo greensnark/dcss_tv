@@ -98,7 +98,7 @@ sub tv_show_playlist {
   $TV->clear();
   if ($prev) {
     $prev = desc_game_brief($prev);
-    $TV->write("\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m");
+    $TV->write("\e[1H\e[1;37mLast game played:\e[0m\e[2H\e[1;33m$prev.\e[0m");
   }
 
   my $pos = 1 + ($prev ? 3 : 0);
@@ -135,6 +135,14 @@ sub request_tv {
   while (1) {
     $TV->clear();
     $TV->write("\e[1H");
+    if ($last_game) {
+      $TV->clear();
+      $TV->write("\e[1H");
+      $TV->write("\e[1;37mThat was:\e[0m\r\n\e[1;33m");
+      $TV->write(desc_game_brief($last_game));
+      $TV->write("\e[0m\r\n\r\n");
+    }
+
     $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
     $TV->write("\r\n\r\n");
 
