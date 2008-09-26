@@ -201,10 +201,6 @@ sub delete_game {
   $g->{deleted} = 'y';
 }
 
-sub check_dirs {
-  mkpath( [ $DATA_DIR, $TTYREC_DIR ] );
-}
-
 sub log_path {
   my $url = shift;
   $DATA_DIR . "/" . url_file($url)
