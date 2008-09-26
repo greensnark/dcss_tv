@@ -129,11 +129,10 @@ sub tv_show_playlist {
 sub request_tv {
   my $last_game;
 
+  open_db();
+
   my $rcheck = threads->new(\&check_requests);
   $rcheck->detach;
-
-  sleep 1;
-  open_db();
 
   while (1) {
     $TV->clear();
