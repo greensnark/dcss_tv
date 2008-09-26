@@ -124,8 +124,6 @@ sub tv_show_playlist {
     undef $first;
     ++$pos;
   }
-
-  sleep(5);
 }
 
 sub request_tv {
@@ -151,6 +149,7 @@ sub request_tv {
     $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
     $TV->write("\r\n\r\n");
 
+    my $slept = 0;
     while (1) {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
@@ -166,10 +165,11 @@ sub request_tv {
       if (@queued_playback) {
         my @copy = map(xlog_line($_), @queued_playback);
         tv_show_playlist(\@copy, $last_game);
-        sleep 4;
+        sleep 4 if $slept < 2;
         last;
       }
 
+      ++$slept;
       sleep 1;
     }
 
