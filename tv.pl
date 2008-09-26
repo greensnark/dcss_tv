@@ -190,12 +190,14 @@ sub find_requested_games {
 
   for my $g (@requests) {
     delete $g->{start} if $g->{start} gt $g->{end};
-    warn "Looking for games matching ", xlog_str($g), "\n";
+
+    my $gdesc = desc_game($g);
+    warn "Looking for games matching ", $gdesc, "\n";
 
     my $filter = make_filter($g);
     my @matches = grep(filter_matches($filter, $_), @ALLGAMES);
 
-    warn "Found ", scalar(@matches), " games for request: ", xlog_str($g), "\n";
+    warn "Found ", scalar(@matches), " games for request: ", $gdesc, "\n";
 
     $_->{req} = $g->{req} for @matches;
     push(@games, @matches);
