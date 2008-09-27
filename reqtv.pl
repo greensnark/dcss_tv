@@ -28,7 +28,7 @@ my @queued_fetch : shared;
 my @queued_playback : shared;
 
 # Fetch mode by default.
-GetOptions(\%opt, 'local');
+GetOptions(\%opt, 'local', 'local-request');
 
 # An appropriately Crawlish number.
 my $PLAYLIST_SIZE = 9;
@@ -37,7 +37,7 @@ my $PLAYLIST_SIZE = 9;
 my $REQUEST_HOST = 'crawl.akrasiac.org';
 my $REQUEST_PORT = 21976;
 
-$REQUEST_HOST = 'localhost' if $opt{local};
+$REQUEST_HOST = 'localhost' if $opt{'local-request'};
 
 my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
                                port => $REQUEST_PORT);
