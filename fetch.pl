@@ -122,7 +122,7 @@ sub fetch_game {
   $g->{start} = $start;
   if ($result) {
     print "Downloaded ttyrecs for ", desc_game($g), "\n";
-    record_game($g, interesting_game($g));
+    record_game($g, interesting_game($g) || 0);
     tty_frame_offset($g, 1);
     print $client "OK " . xlog_str($g, 1) . "\n";
   } else {
