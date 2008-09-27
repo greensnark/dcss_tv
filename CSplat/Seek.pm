@@ -63,9 +63,10 @@ sub tv_frame {
   my $lastattr = '';
   for my $row (1 .. $TERM->rows()) {
     my $text = $TERM->row_text($row);
-    next unless $text;
+    next unless $text =~ /[^\0 ]/;
+
+    $text =~ tr/\0/ /;
     my $tattr = $TERM->row_attr($row);
-    next unless $text =~ /[^ ]/;
     $frame .= "\e[${row}H";
     for (my $i = 0; $i < $TERM->cols(); ++$i) {
       my $attr = substr($tattr, $i * 2, 2);
