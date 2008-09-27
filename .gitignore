@@ -1,2 +1,7 @@
 data
 tv.pwd
+*.log
+*.diff
+*.txt
+*.out
+*.pwd

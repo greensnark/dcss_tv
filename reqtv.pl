@@ -9,8 +9,8 @@ use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
                   fetch_all_games record_played_game
                   clear_played_games query_one/;
 use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
-use CSplat::Ttyrec qw/fetch_ttyrecs record_game clear_cached_urls/;
-use CSplat::Select qw/filter_matches make_filter/;
+use CSplat::Ttyrec qw/request_cache_clear request_download/;
+use CSplat::Select qw/filter_matches make_filter interesting_game/;
 use CSplat::Seek qw/tty_frame_offset/;
 use CSplat::Termcast;
 use CSplat::Request;
@@ -49,7 +49,7 @@ my $TV = CSplat::Termcast->new(name => 'FooTV',
 sub get_game_matching {
   my $g = shift;
   my $filter = make_filter($g);
-  my @games = fetch_all_games();
+  my @games = fetch_all_games(splat => undef);
   @games = grep(filter_matches($filter, $_), @games);
   return $games[0] if @games;
 
@@ -63,21 +63,17 @@ sub download_game {
   $g->{end} = $g->{rend};
   warn "Downloading ttyrecs for ", desc_game($g), "\n";
 
-  # Don't use start time when looking for ttyrecs.
-  delete $g->{start};
-  return unless fetch_ttyrecs($g, 1);
-  $g->{start} = $start;
-  record_game($g);
-  tty_frame_offset($g, 1);
+  $g->{nostart} = 'y';
+  $g->{nocheck} = 'y';
+  return unless request_download($g);
+  delete @$g{qw/nostart nocheck/};
   $g
 }
 
 sub next_request {
   my $g;
-  do {
-    $g = $REQ->next_request();
-  } while ($g->{splat} eq 'y');
-  clear_cached_urls();
+  $g = $REQ->next_request();
+  request_cache_clear();
 
   push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);

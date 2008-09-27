@@ -10,16 +10,18 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     ttyrec_file_time tty_time fetch_ttyrecs
                     update_fetched_games fetch_url record_game
                     tv_frame_strip is_death_ttyrec
-                    ttyrecs_out_of_time_bounds/;
+                    ttyrecs_out_of_time_bounds request_download
+                    request_cache_clear/;
 
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
-                      server_field game_server/;
+                      $FETCH_PORT server_field game_server/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
 use File::Path;
+use IO::Socket::INET;
 
 # Smallest cumulative length of ttyrec that's acceptable.
 our $TTYRMINSZ = 95 * 1024;
@@ -103,7 +105,7 @@ sub uncompress_ttyrec {
 sub fetch_url {
   my ($url, $file) = @_;
   $file ||= url_file($url);
-  my $command = "wget -q -c -O $file $url";
+  my $command = "wget -c -O $file $url";
   my $status = system $command;
   die "Error fetching $url: $?\n" if $status;
 }
@@ -159,13 +161,17 @@ sub download_ttyrecs {
 }
 
 sub record_game {
-  my $game = shift;
+  my ($game, $splat) = @_;
+  die "Must specify splattiness\n" unless defined $splat;
+
   my $req = $game->{req};
   delete $game->{req} if $req;
   record_fetched_game($game);
-  exec_query("INSERT INTO ttyrec (logrecord, ttyrecs)
-              VALUES (?, ?)",
-             xlog_str($game), $game->{ttyrecs});
+
+  $splat = $splat ? 'y' : '';
+  exec_query("INSERT INTO ttyrec (logrecord, ttyrecs, splat)
+              VALUES (?, ?, ?)",
+             xlog_str($game), $game->{ttyrecs}, $splat);
   my $id = last_row_id();
   $game->{req} = $req;
   $game->{id} = $id;
@@ -177,6 +183,7 @@ sub record_fetched_game {
 }
 
 sub update_fetched_games {
+  %FETCHED_GAMES = ();
   my @games = fetch_all_games();
   for my $g (@games) {
     record_fetched_game($g);
@@ -192,9 +199,7 @@ sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
 
   # Check if we already have the game.
-  if (game_was_fetched($g)) {
-    return;
-  }
+  return 1 if game_was_fetched($g);
 
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
@@ -333,6 +338,56 @@ sub tv_frame_strip {
   $rdat =~ s/\xe2\x89\x88/{/g;
 
   $rdat
+}
+
+sub fetch_request {
+  my $sub = shift;
+
+  my $tries = 5;
+  # Open connection and make request.
+  while ($tries-- > 0) {
+    my $sock = IO::Socket::INET->new(PeerAddr => 'localhost',
+                                     PeerPort => $FETCH_PORT,
+                                     Type => SOCK_STREAM,
+                                     Timeout => 5);
+    unless ($sock) {
+      # The fetch server doesn't seem to be running, try starting it.
+      system "perl fetch.pl";
+      # Give it a little time to get moving.
+      sleep 1;
+    }
+    else {
+      return $sub->($sock);
+    }
+  }
+  die "Failed to connect to fetch server\n";
+}
+
+sub request_cache_clear {
+  fetch_request(
+    sub {
+      my $sock = shift;
+      print $sock "CLEAR\n";
+      my $res = <$sock>;
+      $res =~ /OK/
+    } )
+}
+
+sub request_download {
+  my $g = shift;
+  fetch_request( sub { send_download_request(shift, $g) } )
+}
+
+sub send_download_request {
+  my ($sock, $g) = @_;
+  print $sock "G " . xlog_str($g) . "\n";
+  my $response = <$sock>;
+  return unless $response =~ /OK/;
+
+  chomp $response;
+  my ($ttyrecs) = $response =~ /^OK (.*)/;
+  $g->{ttyrecs} = $ttyrecs;
+  1
 }
 
 1;

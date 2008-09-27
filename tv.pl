@@ -56,7 +56,7 @@ my $TV = CSplat::Termcast->new(name => $NAME,
                               );
 
 sub scan_ttyrec_list {
-  @TVGAMES = @ALLGAMES = fetch_all_games();
+  @TVGAMES = @ALLGAMES = fetch_all_games(splat => 'y');
   if ($opt{filter}) {
     my $filter = xlog_line($opt{filter});
     @TVGAMES = grep(filter_matches($filter, $_), @TVGAMES);
@@ -234,8 +234,10 @@ sub check_splat_requests {
 }
 
 sub run_splat_request_thread {
-  my $t = threads->new(\&check_splat_requests);
-  $t->detach;
+  # All requests go to FooTV.
+
+  #my $t = threads->new(\&check_splat_requests);
+  #$t->detach;
 }
 
 sub delta_seconds {

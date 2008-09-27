@@ -62,7 +62,7 @@ sub tv_frame {
   my $frame = "\e[2J\e[0m";
   my $lastattr = '';
   for my $row (1 .. $TERM->rows()) {
-    my $text = $TERM->row_plaintext($row);
+    my $text = $TERM->row_text($row);
     next unless $text;
     my $tattr = $TERM->row_attr($row);
     next unless $text =~ /[^ ]/;

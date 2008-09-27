@@ -14,10 +14,9 @@ use CSplat::DB qw/open_db fetch_all_games exec_query
                   query_one in_transaction purge_log_offsets
                   tty_delete_frame_offset check_dirs/;
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
-use CSplat::Ttyrec qw/url_file fetch_ttyrecs
-                      update_fetched_games fetch_url record_game
-                      clear_cached_urls ttyrec_path is_death_ttyrec
-                      ttyrecs_out_of_time_bounds/;
+use CSplat::Ttyrec qw/url_file fetch_url ttyrec_path is_death_ttyrec
+                      ttyrecs_out_of_time_bounds request_download
+                      request_cache_clear/;
 use CSplat::Xlog qw/xlog_line desc_game/;
 use CSplat::Select qw/interesting_game is_blacklisted filter_matches/;
 use CSplat::Seek qw/tty_frame_offset set_buildup_size/;
@@ -79,14 +78,13 @@ sub read_log {
 }
 
 sub fetch {
-  update_fetched_games();
   rescan_games() if $opt{rescan};
   while (1) {
     fetch_logs(@LOG_URLS);
     trawl_games();
     print "Sleeping between log scans...\n";
     sleep 600;
-    clear_cached_urls();
+    request_cache_clear();
   }
 }
 
@@ -104,7 +102,7 @@ sub sanity_check_pred {
 # Goes through all the games we've flagged in the DB, deleting those
 # that don't match interesting_game.
 sub rescan_games {
-  my @games = fetch_all_games();
+  my @games = fetch_all_games(splat => 'y');
 
   in_transaction(
     sub {
@@ -121,7 +119,7 @@ sub rescan_games {
 # Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
 # will also delete games that have no death ttyrecs.
 sub sanity_check {
-  my @games = fetch_all_games();
+  my @games = fetch_all_games(splat => 'y');
 
   if ($opt{filter}) {
     my $filter = xlog_line($opt{filter});
@@ -241,16 +239,14 @@ sub trawl_games {
     my $fh = seek_log($log);
     while (my $game = read_log($fh, $log)) {
 
-      my $good_game = interesting_game($game, 1) && fetch_ttyrecs($game);
+      my $good_game =
+        interesting_game($game, 1) && do {
+          print "Downloading ", desc_game($game), "\n";
+          request_download($game);
+        };
       $games++ if $good_game;
 
-      in_transaction(sub {
-                       record_game($game) if $good_game;
-                       record_log_place($log, $game)
-                     });
-
-      # This is time consuming, so don't do it for every game.
-      tty_frame_offset($game, 1) if $good_game;
+      record_log_place($log, $game);
 
       if (!(++$lines % 100)) {
         my $total = $games + $existing_games;

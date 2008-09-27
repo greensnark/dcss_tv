@@ -60,6 +60,11 @@ sub exec_query {
   $st
 }
 
+sub exec_query_all {
+  my ($query, @pars) = @_;
+  exec_query($query, @pars)->fetchall_arrayref()
+}
+
 sub exec_do {
   my $query = shift;
   check_exec($query, sub { $DBH->do($query) })
@@ -123,7 +128,8 @@ T2
   CREATE TABLE ttyrec (
      id INTEGER PRIMARY KEY AUTOINCREMENT,
      logrecord TEXT,
-     ttyrecs TEXT
+     ttyrecs TEXT,
+     splat TEXT NOT NULL DEFAULT ''
   );
 T3
                    <<'T4',
@@ -174,7 +180,13 @@ sub tty_save_frame_offset {
 }
 
 sub fetch_all_games {
-  my $rows = exec_all("SELECT id, logrecord, ttyrecs FROM ttyrec");
+  my %pars = @_;
+
+  my $rows =
+    defined($pars{splat})?
+      exec_query_all("SELECT id, logrecord, ttyrecs FROM ttyrec
+                      WHERE splat = ?", $pars{splat})
+        : exec_all("SELECT id, logrecord, ttyrecs FROM ttyrec");
 
   my @games;
   for my $row (@$rows) {
@@ -182,6 +194,7 @@ sub fetch_all_games {
     my $g = xlog_line($row->[1]);
     $g->{ttyrecs} = $row->[2];
     $g->{id} = $id;
+    $g->{splat} = $pars{splat};
     push @games, $g;
   }
   @games

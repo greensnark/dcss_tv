@@ -6,7 +6,7 @@ package CSplat::Config;
 use base 'Exporter';
 our @EXPORT_OK = qw/$DATA_DIR $TTYREC_DIR %SERVMAP
                     $UTC_EPOCH $UTC_BEFORE $UTC_AFTER
-                    server_field game_server/;
+                    $FETCH_PORT server_field game_server/;
 
 use Carp;
 use Date::Manip;
@@ -17,6 +17,9 @@ our $TTYREC_DIR = "$DATA_DIR/ttyrecs";
 our $UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
 our $UTC_BEFORE = DateCalc($UTC_EPOCH, "-1 days");
 our $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
+
+# Port that the ttyrec fetch server listens on.
+our $FETCH_PORT = 41280;
 
 our %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
