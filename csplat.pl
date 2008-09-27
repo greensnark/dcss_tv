@@ -15,8 +15,7 @@ use CSplat::DB qw/open_db fetch_all_games exec_query
                   tty_delete_frame_offset check_dirs/;
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
 use CSplat::Ttyrec qw/url_file fetch_url ttyrec_path is_death_ttyrec
-                      ttyrecs_out_of_time_bounds request_download
-                      request_cache_clear/;
+                      ttyrecs_out_of_time_bounds request_download/;
 use CSplat::Xlog qw/xlog_line desc_game/;
 use CSplat::Select qw/interesting_game is_blacklisted filter_matches/;
 use CSplat::Seek qw/tty_frame_offset set_buildup_size/;
@@ -84,7 +83,6 @@ sub fetch {
     trawl_games();
     print "Sleeping between log scans...\n";
     sleep 600;
-    request_cache_clear();
   }
 }
 

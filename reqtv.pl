@@ -9,7 +9,7 @@ use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
                   fetch_all_games record_played_game
                   clear_played_games query_one/;
 use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
-use CSplat::Ttyrec qw/request_cache_clear request_download/;
+use CSplat::Ttyrec qw/request_download/;
 use CSplat::Select qw/filter_matches make_filter interesting_game/;
 use CSplat::Seek qw/tty_frame_offset/;
 use CSplat::Termcast;
@@ -73,7 +73,6 @@ sub download_game {
 sub next_request {
   my $g;
   $g = $REQ->next_request();
-  request_cache_clear();
 
   push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);

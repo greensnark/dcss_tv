@@ -246,9 +246,11 @@ sub human_readable_size {
 }
 
 sub fetch_ttyrec_urls_from_server {
-  my ($name, $userpath) = @_;
+  my ($name, $userpath, $time_wanted) = @_;
 
-  return @{$CACHED_TTYREC_URLS{$userpath}} if $CACHED_TTYREC_URLS{$userpath};
+  my $now = time();
+  my $cache = $CACHED_TTYREC_URLS{$userpath};
+  return @{$cache->[1]} if $cache && $cache->[0] >= $time_wanted;
 
   print "Fetching ttyrec listing for $name\n";
   my $listing = get($userpath) or return ();
@@ -262,7 +264,7 @@ sub fetch_ttyrec_urls_from_server {
   my @ttyrecs = map(clean_ttyrec_url($userpath, $_),
                     grep($_->{u} =~ /\.ttyrec/, @urls));
 
-  $CACHED_TTYREC_URLS{$userpath} = \@ttyrecs;
+  $CACHED_TTYREC_URLS{$userpath} = [ $now, \@ttyrecs ];
   @ttyrecs
 }
 
@@ -271,7 +273,8 @@ sub find_ttyrecs {
   my $servpath = server_field($g, 'ttypath');
   my $userpath = "$servpath/$g->{name}";
 
-  my @urls = fetch_ttyrec_urls_from_server($g->{name}, $userpath);
+  my $time = int(UnixDate(tty_time($g, 'end'), "%s"));
+  my @urls = fetch_ttyrec_urls_from_server($g->{name}, $userpath, $time);
   @urls
 }
 
