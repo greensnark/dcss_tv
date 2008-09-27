@@ -77,6 +77,7 @@ sub next_request {
 
   push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);
+  $game->{req} = $g->{req};
   if ($game) {
     push @queued_playback, xlog_str($game, 1);
   } else {
@@ -145,6 +146,7 @@ sub request_tv {
     $TV->write("\r\n\r\n");
 
     my $slept = 0;
+    my $req_seen;
     while (1) {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
@@ -155,6 +157,7 @@ sub request_tv {
           $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
           $TV->write("Please wait, fetching game...\r\n");
         }
+        $req_seen = 1;
       }
 
       if (@queued_playback) {
@@ -164,7 +167,7 @@ sub request_tv {
         last;
       }
 
-      ++$slept;
+      ++$slept if $req_seen;
       sleep 1;
     }
 
