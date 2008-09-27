@@ -106,7 +106,7 @@ sub uncompress_ttyrec {
 sub fetch_url {
   my ($url, $file) = @_;
   $file ||= url_file($url);
-  my $command = "wget -c -O $file $url";
+  my $command = "wget -q -c -O $file $url";
   my $status = system $command;
   die "Error fetching $url: $?\n" if $status;
 }
