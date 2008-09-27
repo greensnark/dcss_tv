@@ -40,6 +40,16 @@ sub xlog_str {
   join(":", map { "$_=@{[ escape_xlogfield($hash{$_}) ]}" } keys(%hash))
 }
 
+sub xlog_merge {
+  my $first = shift;
+  for my $sec (@_) {
+    for my $key (keys %$sec) {
+      $first->{$key} = $sec->{$key} unless $first->{$key};
+    }
+  }
+  $first
+}
+
 sub desc_game {
   my $g = shift;
   my $god = $g->{god} ? ", worshipper of $g->{god}" : "";

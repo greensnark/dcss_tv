@@ -15,7 +15,7 @@ use CSplat::Ttyrec qw/update_fetched_games clear_cached_urls fetch_ttyrecs
 use CSplat::Seek qw/tty_frame_offset/;
 use CSplat::Select qw/interesting_game/;
 use CSplat::DB qw/open_db/;
-use CSplat::Xlog qw/xlog_line desc_game/;
+use CSplat::Xlog qw/xlog_line xlog_str desc_game/;
 
 use POSIX;
 
@@ -124,7 +124,7 @@ sub fetch_game {
     print "Downloaded ttyrecs for ", desc_game($g), "\n";
     record_game($g, interesting_game($g));
     tty_frame_offset($g, 1);
-    print $client "OK $g->{ttyrecs}\n";
+    print $client "OK " . xlog_str($g, 1) . "\n";
   } else {
     print $client "FAIL\n";
   }

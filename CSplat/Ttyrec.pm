@@ -385,8 +385,8 @@ sub send_download_request {
   return unless $response =~ /OK/;
 
   chomp $response;
-  my ($ttyrecs) = $response =~ /^OK (.*)/;
-  $g->{ttyrecs} = $ttyrecs;
+  my ($xlog) = $response =~ /^OK (.*)/;
+  xlog_merge($g, xlog_line($xlog));
   1
 }
 
