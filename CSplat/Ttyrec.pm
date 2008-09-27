@@ -16,7 +16,7 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
                       $FETCH_PORT server_field game_server/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
-                    xlog_line/;
+                    xlog_line xlog_merge/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use Carp;
 use Date::Manip;

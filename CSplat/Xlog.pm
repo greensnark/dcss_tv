@@ -5,7 +5,8 @@ package CSplat::Xlog;
 
 use base 'Exporter';
 our @EXPORT_OK = qw/xlog_line desc_game desc_game_brief
-                    fix_crawl_time game_unique_key xlog_str/;
+                    fix_crawl_time game_unique_key xlog_str
+                    xlog_merge/;
 
 our $MAX_WIDTH = 80;
 
