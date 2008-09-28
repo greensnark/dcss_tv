@@ -200,7 +200,7 @@ sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
 
   # Check if we already have the game.
-  my $fetched = $game_was_fetched($g);
+  my $fetched = game_was_fetched($g);
   if ($fetched) {
     return xlog_merge($g, $fetched);
   }
