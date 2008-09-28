@@ -44,6 +44,12 @@ sub clear {
   $self->write("\e[2J");
 }
 
+sub reset {
+  my $self = shift;
+  $self->connect();
+  $self->write("\e[c");
+}
+
 sub connect {
   my $self = shift;
   return if defined($self->{SOCK});
@@ -134,6 +140,7 @@ sub play_game {
   my ($ttr, $offset, $frame) = tty_frame_offset($g);
 
   $self->clear();
+  $self->reset();
 
   my $skipping = 1;
   for my $ttyrec (split / /, $g->{ttyrecs}) {
