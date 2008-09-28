@@ -122,7 +122,8 @@ sub fetch_game {
   $g->{start} = $start;
   if ($result) {
     print "Downloaded ttyrecs for ", desc_game($g), "\n";
-    record_game($g, interesting_game($g) || 0);
+    # If the game already has an id, it's already been registered
+    record_game($g, interesting_game($g) || 0) unless $g->{id};
     tty_frame_offset($g, 1);
     print $client "OK " . xlog_str($g, 1) . "\n";
   } else {
