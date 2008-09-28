@@ -347,13 +347,13 @@ sub tv_frame_strip {
 sub fetch_request {
   my $sub = shift;
 
-  my $tries = 5;
+  my $tries = 25;
   # Open connection and make request.
   while ($tries-- > 0) {
     my $sock = IO::Socket::INET->new(PeerAddr => 'localhost',
                                      PeerPort => $FETCH_PORT,
                                      Type => SOCK_STREAM,
-                                     Timeout => 5);
+                                     Timeout => 15);
     unless ($sock) {
       # The fetch server doesn't seem to be running, try starting it.
       system "perl fetch.pl";
@@ -386,7 +386,7 @@ sub send_download_request {
   my ($sock, $g) = @_;
   print $sock "G " . xlog_str($g) . "\n";
   my $response = <$sock>;
-  return unless $response =~ /OK/;
+  return unless ($response || '') =~ /OK/;
 
   chomp $response;
   my ($xlog) = $response =~ /^OK (.*)/;
