@@ -65,7 +65,7 @@ sub download_game {
 
   $g->{nostart} = 'y';
   $g->{nocheck} = 'y';
-  return unless request_download($g);
+  return undef unless request_download($g);
   delete @$g{qw/nostart nocheck/};
   $g
 }
@@ -76,8 +76,8 @@ sub next_request {
 
   push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);
-  $game->{req} = $g->{req};
   if ($game) {
+    $game->{req} = $g->{req};
     push @queued_playback, xlog_str($game, 1);
   } else {
     $g->{failed} = 1;

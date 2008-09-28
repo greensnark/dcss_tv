@@ -133,7 +133,7 @@ sub fetch_game {
     tty_frame_offset($g, 1);
     print $client "OK " . xlog_str($g, 1) . "\n";
   } else {
-    print "Failed to download", desc_game($g), "\n";
+    print "Failed to download ", desc_game($g), "\n";
     print $client "FAIL\n";
   }
 }
