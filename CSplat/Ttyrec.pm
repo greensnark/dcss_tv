@@ -389,7 +389,7 @@ sub send_download_request {
   my ($sock, $g) = @_;
   print $sock "G " . xlog_str($g) . "\n";
   my $response = <$sock>;
-  return unless ($response || '') =~ /OK/;
+  return undef unless ($response || '') =~ /OK/;
 
   chomp $response;
   my ($xlog) = $response =~ /^OK (.*)/;
