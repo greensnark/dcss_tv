@@ -130,6 +130,7 @@ sub request_tv {
   my $rcheck = threads->new(\&check_requests);
   $rcheck->detach;
 
+ RELOOP:
   while (1) {
     $TV->clear();
     $TV->write("\e[1H");
@@ -145,12 +146,15 @@ sub request_tv {
     $TV->write("\r\n\r\n");
 
     my $slept = 0;
+    my $failed;
     my $req_seen;
     while (1) {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
         if ($f->{failed}) {
           $TV->write("Failed to fetch game:\r\n", desc_game_brief($f), "\r\n");
+          $failed = 1;
+          $slept = 1;
         }
         else {
           $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
@@ -167,6 +171,7 @@ sub request_tv {
       }
 
       ++$slept if $req_seen;
+      next RELOOP if $slept > 20 && $failed;
       sleep 1;
     }
 
