@@ -121,9 +121,15 @@ sub fetch_game {
   my $result = fetch_ttyrecs($g, $nocheck);
   $g->{start} = $start;
   if ($result) {
-    print "Downloaded ttyrecs for ", desc_game($g), "\n";
+    my $dejafait = $g->{id};
+    if ($dejafait) {
+      print "Not redownloading ttyrecs for ", desc_game($g), "\n";
+    }
+    else {
+      print "Downloaded ttyrecs for ", desc_game($g), "\n";
+    }
     # If the game already has an id, it's already been registered
-    record_game($g, interesting_game($g) || 0) unless $g->{id};
+    record_game($g, interesting_game($g) || 0) unless $dejafait;
     tty_frame_offset($g, 1);
     print $client "OK " . xlog_str($g, 1) . "\n";
   } else {
