@@ -180,7 +180,7 @@ sub record_game {
 
 sub record_fetched_game {
   my $g = shift;
-  $FETCHED_GAMES{game_unique_key($g)} = 1;
+  $FETCHED_GAMES{game_unique_key($g)} = $g;
 }
 
 sub update_fetched_games {
@@ -200,7 +200,10 @@ sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
 
   # Check if we already have the game.
-  return 1 if game_was_fetched($g);
+  my $fetched = $game_was_fetched($g);
+  if ($fetched) {
+    return xlog_merge($g, $fetched);
+  }
 
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
