@@ -20,11 +20,16 @@ my $TERM_X = 80;
 my $TERM_Y = 24;
 my $TERM = Term::VT102::Boundless->new(cols => $TERM_X, rows => $TERM_Y);
 
-my $BUILDUP_SIZE = $TTYRDEFSZ * 3;
+our $BUILDUP_SIZE = $TTYRDEFSZ * 3;
 
 sub set_buildup_size {
   my $sz = shift;
   $BUILDUP_SIZE = $TTYRDEFSZ * ($sz || 3);
+}
+
+sub set_default_playback_multiplier {
+  my $sz = shift;
+  $TTYRDEFSZ *= $sz;
 }
 
 sub clear_screen {
@@ -98,8 +103,16 @@ sub tty_calc_frame_offset {
 
   my $sz = $g->{sz};
   my $skipsize = 0;
-  if ($sz > $TTYRDEFSZ) {
-    $skipsize = $sz - $TTYRDEFSZ;
+
+  my $defsz = $TTYRDEFSZ;
+
+  # Give more seekback to Zot games.
+  if ($g->{place} =~ /^Zot/) {
+    $defsz *= 2;
+  }
+
+  if ($sz > $defsz) {
+    $skipsize = $sz - $defsz;
   }
 
   for my $ttyrec (split / /, $g->{ttyrecs}) {

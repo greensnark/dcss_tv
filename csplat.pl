@@ -48,7 +48,7 @@ my %opt;
 # Fetch mode by default.
 GetOptions(\%opt, 'rescan', 'local', 'migrate',
            'sanity-check', 'sanity-fix', 'filter=s',
-           're-seek=f');
+           're-seek=f', 'default-seek=f');
 
 sub seek_log {
   my $url = shift;
@@ -127,6 +127,10 @@ sub sanity_check {
   if ($opt{'re-seek'}) {
     my $off = $opt{'re-seek'};
     set_buildup_size($off);
+  }
+
+  if ($opt{'default-seek'}) {
+    set_default_playback_multiplier($opt{'default-seek'});
   }
 
   print "Running sanity-check";
