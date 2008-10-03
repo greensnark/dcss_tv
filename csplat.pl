@@ -47,7 +47,7 @@ my %opt;
 
 # Fetch mode by default.
 GetOptions(\%opt, 'rescan', 'local', 'migrate',
-           'sanity-check', 'sanity-fix', 'filter=s',
+           'sanity-check', 'sanity-fix', 'filter=s@',
            're-seek=f', 'default-seek=f');
 
 sub seek_log {
@@ -120,8 +120,13 @@ sub sanity_check {
   my @games = fetch_all_games(splat => 'y');
 
   if ($opt{filter}) {
-    my $filter = xlog_line($opt{filter});
-    @games = grep(filter_matches($filter, $_), @games);
+    my @chosen;
+
+    for my $filter (@{$opt{filter}}) {
+      my $xlogfilter = xlog_line($filter);
+      push @chosen, grep(filter_matches($xlogfilter, $_), @games);
+    }
+    @games = @chosen;
   }
 
   if ($opt{'re-seek'}) {
