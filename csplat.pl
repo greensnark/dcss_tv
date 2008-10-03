@@ -48,7 +48,7 @@ my %opt;
 # Fetch mode by default.
 GetOptions(\%opt, 'rescan', 'local', 'migrate',
            'sanity-check', 'sanity-fix', 'filter=s@',
-           're-seek=f', 'default-seek=f');
+           're-seek=f', 'default-seek=f', 'purge');
 
 sub seek_log {
   my $url = shift;
@@ -112,6 +112,13 @@ sub rescan_games {
 
       purge_log_offsets();
       } );
+}
+
+sub purge_nonsplats {
+  my @games = fetch_all_games(splat => '');
+  for my $g (@games) {
+    delete_game($g);
+  }
 }
 
 # Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
@@ -269,6 +276,9 @@ if ($opt{migrate}) {
 }
 elsif ($opt{'sanity-check'}) {
   sanity_check();
+}
+elsif ($opt{purge}) {
+  purge_nonsplats();
 }
 else {
   fetch();
