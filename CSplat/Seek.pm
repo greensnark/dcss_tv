@@ -37,9 +37,8 @@ sub clear_screen {
 }
 
 sub tv_cache_reset {
-  $TERM->process(clear_screen());
-  # Go to first row and reset attributes.
-  $TERM->process("\e[1H\e[0m");
+  $TERM->reset();
+  $TERM->resize($TERM_X, $TERM_Y);
 }
 
 sub tv_cache_frame {
