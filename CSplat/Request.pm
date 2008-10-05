@@ -46,6 +46,13 @@ sub next_request_line {
     my $SOCK = $self->{SOCK};
 
     my $line = <$SOCK>;
+
+    if (!defined($line)) {
+      # Lost our connection...
+      delete $self->{SOCK};
+      next;
+    }
+
     next unless $line && $line =~ /\S/;
     chomp $line;
 
@@ -56,7 +63,11 @@ sub next_request_line {
 sub next_request {
   my $self = shift;
   while (1) {
-    my $line = $self->next_request_line();
+    my $line;
+    eval {
+      $line = $self->next_request_line();
+    };
+    warn "$@" if $@;
     if ($line =~ /^\d+ (.*)/) {
       return xlog_line($1);
     }
