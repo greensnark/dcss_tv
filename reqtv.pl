@@ -60,8 +60,7 @@ sub get_game_matching {
 sub download_game {
   my $g = shift;
 
-  my $start = $g->{start} = $g->{rstart};
-  $g->{end} = $g->{rend};
+  my $start = $g->{start};
   warn "Downloading ttyrecs for ", desc_game($g), "\n";
 
   $g->{nostart} = 'y';
@@ -74,6 +73,10 @@ sub download_game {
 sub next_request {
   my $g;
   $g = $REQ->next_request();
+
+  $g->{start} = $g->{rstart};
+  $g->{end} = $g->{rend};
+  $g->{time} = $g->{rtime};
 
   push @queued_fetch, xlog_str($g);
   my $game = get_game_matching($g);
