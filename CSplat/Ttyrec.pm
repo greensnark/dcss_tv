@@ -176,7 +176,6 @@ sub record_game {
   delete $game->{req} if $req;
   record_fetched_game($game);
 
-  $splat = $splat ? 'y' : '';
   exec_query("INSERT INTO games (src, player, gtime, logrecord, ttyrecs, etype)
               VALUES (?, ?, ?, ?, ?, ?)",
              $game->{src}, $game->{name}, $game->{end} || $game->{time},
