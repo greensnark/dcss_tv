@@ -208,7 +208,7 @@ sub tty_find_offset_deep {
   }
 
   if (!$skipsize) {
-    return ($ttyrec, 0, '');
+    return ($ttyrec, 0, undef, '');
   }
 
   my $prev_frame = 0;
@@ -272,7 +272,7 @@ sub tty_find_offset_deep {
         print "\nFound full hp frame $best_type ($best_hp/$best_maxhp) ",
           "with size left (", ($tsz - $last_full_hp),
           ", avg wanted: $TTYRDEFSZ)!\n";
-        return ($ttyrec, $last_full_hp, $last_full_hp_frame);
+        return ($ttyrec, $last_full_hp, undef, $last_full_hp_frame);
       }
       print "\nReturning frame at default seek\n";
       return ($ttyrec, $pos, undef, tv_frame());
