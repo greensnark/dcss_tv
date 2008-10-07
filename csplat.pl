@@ -255,7 +255,7 @@ sub delete_game {
       unlink $file;
     }
   }
-  exec_query("DELETE FROM ttyrec WHERE id = ?", $g->{id});
+  exec_query("DELETE FROM games WHERE id = ?", $g->{id});
   $g->{deleted} = 'y';
 }
 
