@@ -53,6 +53,20 @@ sub clear_cached_urls {
   %CACHED_TTYREC_URLS = ();
 }
 
+sub have_cached_listing_for_game {
+  my $g = shift;
+  my $servpath = server_field($g, 'ttypath');
+  my $userpath = "$servpath/$g->{name}";
+  $CACHED_TTYREC_URLS{$userpath}
+}
+
+sub clear_cached_urls_for_game {
+  my $g = shift;
+  my $servpath = server_field($g, 'ttypath');
+  my $userpath = "$servpath/$g->{name}";
+  delete $CACHED_TTYREC_URLS{$userpath};
+}
+
 sub ttyrecs_out_of_time_bounds {
   my $g = shift;
   my $start = tty_time($g, 'start');

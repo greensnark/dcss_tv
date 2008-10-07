@@ -99,7 +99,20 @@ sub process_command {
 
   if ($cmd eq 'G') {
     my ($game) = $command =~ /^\w+ (.*)/;
-    fetch_game($client, $game)
+
+    my $g = xlog_line($game);
+    my $have_cache = CSplat::Ttyrec::have_cached_listing_for_game($g);
+
+    my $res;
+    eval {
+      $res = fetch_game($client, $game)
+    };
+    if ($@ && $have_cache) {
+      warn "$@";
+      CSplat::Ttyrec::clear_cached_urls_for_game($g);
+      $res = fetch_game($client, $game);
+    }
+    $res
   }
   elsif ($cmd eq 'CLEAR') {
     clear_cached_urls();
