@@ -245,9 +245,12 @@ sub register_ttyrec {
   my ($g, $ttyrec, $seektime) = @_;
   my ($start, $end, $seek_offset) = ttyrec_play_time($g, $ttyrec, $seektime);
 
-  exec_query('INSERT INTO ttyrec (ttyrec, src, player, stime, etime)
-              VALUES (?, ?, ?, ?, ?)',
-             $ttyrec, $g->{src}, $g->{name}, $start, $end);
+  eval {
+    exec_query('INSERT INTO ttyrec (ttyrec, src, player, stime, etime)
+                VALUES (?, ?, ?, ?, ?)',
+               $ttyrec, $g->{src}, $g->{name}, $start, $end);
+  };
+  warn $@ if $@;
   $seek_offset
 }
 
