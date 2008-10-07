@@ -276,7 +276,7 @@ sub record_log_place {
 }
 
 sub count_existing_games {
-  query_one("SELECT COUNT(*) FROM ttyrec")
+  query_one("SELECT COUNT(*) FROM games WHERE etype='y'")
 }
 
 #######################################################################
