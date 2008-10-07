@@ -3,6 +3,7 @@ use warnings;
 
 package CSplat::Ttyrec;
 
+use lib '..';
 use base 'Exporter';
 
 our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
@@ -23,6 +24,7 @@ use Date::Manip;
 use LWP::Simple;
 use File::Path;
 use IO::Socket::INET;
+use Term::TtyRec::Plus;
 
 # Smallest cumulative length of ttyrec that's acceptable.
 our $TTYRMINSZ = 95 * 1024;
@@ -158,11 +160,16 @@ sub download_ttyrecs {
   $g->{ttyrecs} = join(" ", map($_->{u}, @tofetch));
   $g->{ttyrecurls} = \@tofetch;
 
+  for my $ttyrec (split / /, $g->{ttyrecs}) {
+    register_ttyrec($g, $ttyrec);
+  }
+
   1
 }
 
 sub record_game {
   my ($game, $splat) = @_;
+
   die "Must specify splattiness\n" unless defined $splat;
 
   my $req = $game->{req};
@@ -170,12 +177,83 @@ sub record_game {
   record_fetched_game($game);
 
   $splat = $splat ? 'y' : '';
-  exec_query("INSERT INTO ttyrec (logrecord, ttyrecs, splat)
-              VALUES (?, ?, ?)",
+  exec_query("INSERT INTO games (src, player, gtime, logrecord, ttyrecs, etype)
+              VALUES (?, ?, ?, ?, ?, ?)",
+             $game->{src}, $game->{name}, $game->{end} || $game->{time},
              xlog_str($game), $game->{ttyrecs}, $splat);
   my $id = last_row_id();
   $game->{req} = $req;
   $game->{id} = $id;
+}
+
+# Registers a ttyrec if it is not already registered.
+sub check_register_ttyrec {
+  my ($g, $ttyrec) = @_;
+  my $row =
+    CSplat::DB::exec_query_all('SELECT * FROM ttyrec WHERE ttyrec = ?',
+                               $ttyrec);
+  if (!$row || @$row == 0) {
+    print "Registering ttyrec $ttyrec\n";
+    register_ttyrec($g, $ttyrec);
+  }
+}
+
+sub ttyrec_play_time {
+  my ($g, $ttyrec, $seektime) = @_;
+
+  my $file = ttyrec_path($g, $ttyrec);
+
+  my $start = ttyrec_file_time($ttyrec);
+  my $t = Term::TtyRec::Plus->new(infile => $file);
+
+  my $last_ts;
+  my $first_ts;
+
+  my $seekdelta =
+    $seektime ? int(Delta_Format(DateCalc($start, $seektime), undef, '%st'))
+              : undef;
+
+  my $pframe;
+  my $frame;
+  my $seek_frame_offset;
+  eval {
+    while (my $fref = $t->next_frame()) {
+      $frame = tell($t->filehandle()) if $seekdelta;
+
+      my $ts = $fref->{orig_timestamp};
+      $first_ts = $ts unless defined $first_ts;
+      $last_ts = $ts;
+
+      if (defined($seekdelta) && !$seek_frame_offset
+          && $last_ts - $first_ts >= $seekdelta)
+      {
+        $seek_frame_offset = $pframe || $frame;
+      }
+
+      $pframe = $frame;
+    }
+  };
+  warn "$@" if $@;
+
+  my $delta = int($last_ts - $first_ts);
+  my $end = DateCalc($start, "+ $delta seconds");
+
+  ($start, $end, $seek_frame_offset)
+}
+
+sub register_ttyrec {
+  my ($g, $ttyrec, $seektime) = @_;
+  my ($start, $end, $seek_offset) = ttyrec_play_time($g, $ttyrec, $seektime);
+
+  exec_query('INSERT INTO ttyrec (ttyrec, src, player, stime, etime)
+              VALUES (?, ?, ?, ?, ?)',
+             $ttyrec, $g->{src}, $g->{name}, $start, $end);
+  $seek_offset
+}
+
+sub unregister_ttyrec {
+  my ($g, $ttyrec) = @_;
+  exec_query('DELETE FROM ttyrec WHERE ttyrec = ?', $ttyrec)
 }
 
 sub record_fetched_game {
@@ -196,6 +274,14 @@ sub game_was_fetched {
   $FETCHED_GAMES{game_unique_key($g)}
 }
 
+sub find_existing_ttyrec {
+  my ($g, $end) = @_;
+  CSplat::DB::query_one("SELECT ttyrec FROM ttyrec
+                         WHERE src = ? AND player = ?
+                           AND stime <= ? AND etime >= ?",
+                        $g->{src}, $g->{name}, $end, $end)
+}
+
 sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
 
@@ -207,8 +293,25 @@ sub fetch_ttyrecs {
 
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end');
+  $end ||= tty_time($g, 'time');
 
-  my @ttyrecs = find_ttyrecs($g) or do {
+  my @ttyrecs;
+
+  # If we have only an end time, look for an existing ttyrec that
+  # covers this time.
+  if (!$start && $end) {
+    my $ttyrec = find_existing_ttyrec($g, $end);
+    if ($ttyrec) {
+      push @ttyrecs, $ttyrec;
+
+      # Early exit.
+      $g->{ttyrecs} = $ttyrec;
+      $g->{ttyrecurls} = \@ttyrecs;
+      return $g;
+    }
+  }
+
+  @ttyrecs = find_ttyrecs($g) or do {
     print "No ttyrecs on server for ", desc_game($g), "?\n";
     return;
   };
@@ -276,7 +379,8 @@ sub find_ttyrecs {
   my $servpath = server_field($g, 'ttypath');
   my $userpath = "$servpath/$g->{name}";
 
-  my $time = int(UnixDate(tty_time($g, 'end'), "%s"));
+  my $end = tty_time($g, 'end') || tty_time($g, 'time');
+  my $time = int(UnixDate($end, "%s"));
   my @urls = fetch_ttyrec_urls_from_server($g->{name}, $userpath, $time);
   @urls
 }

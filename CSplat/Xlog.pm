@@ -54,9 +54,9 @@ sub xlog_merge {
 sub desc_game {
   my $g = shift;
   my $god = $g->{god} ? ", worshipper of $g->{god}" : "";
-  my $dmsg = $g->{vmsg} || $g->{tmsg};
+  my $dmsg = $g->{vmsg} || $g->{tmsg} || $g->{milestone};
   my $place = $g->{place};
-  my $ktyp = $g->{ktyp};
+  my $ktyp = $g->{ktyp} || '';
 
   my $prep = grep($_ eq $place, qw/Temple Blade Hell/)? "in" : "on";
   $prep = "in" if $g->{ltyp} ne 'D';
@@ -68,7 +68,7 @@ sub desc_game {
 
   $place = '' if $ktyp eq 'winning' || $ktyp eq 'leaving';
 
-  my $when = " on " . fix_crawl_time($g->{end});
+  my $when = " on " . fix_crawl_time($g->{end} || $g->{time});
 
   "$g->{name} the $g->{title} (L$g->{xl} $g->{char})$god, $dmsg$place$when, " .
     "after $g->{turn} turns"
@@ -98,7 +98,7 @@ sub desc_game_brief {
                 "L$xl $$g{char}",
                 pad_god(10, $$g{god}),
                 pad(7, $$g{place}),
-                $$g{tmsg});
+                $$g{tmsg} || $$g{milestone});
   @pieces = grep($_, @pieces);
   my $text = join("  ", @pieces);
   $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
@@ -113,7 +113,8 @@ sub desc_game_brief {
 
 sub game_unique_key {
   my $g = shift;
-  "$g->{name}|$g->{end}|$g->{src}"
+  my $end = $g->{end} || $g->{time};
+  "$g->{name}|$end|$g->{src}"
 }
 
 1

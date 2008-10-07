@@ -122,6 +122,13 @@ sub interesting_game {
   $ret
 }
 
+sub game_splattiness {
+  my $g = shift;
+  return 'm' if $g->{milestone};
+  return 'y' if $g->{splat} || CSplat::Select::interesting_game($g);
+  return '';
+}
+
 sub _interesting_game {
   my ($g, $fix_time) = @_;
 

@@ -117,7 +117,7 @@ sub is_death_frame {
 }
 
 sub play_ttyrec {
-  my ($self, $g, $ttyfile, $offset, $frame) = @_;
+  my ($self, $g, $ttyfile, $offset, $stop_offset, $frame) = @_;
 
   $self->write($frame) if $frame;
 
@@ -130,6 +130,8 @@ sub play_ttyrec {
     select undef, undef, undef, $fref->{diff};
     $self->write(tv_frame_strip($fref->{data}));
     select undef, undef, undef, 1 if is_death_frame($fref->{data});
+
+    last if $stop_offset && tell($t->filehandle()) >= $stop_offset;
   }
   close($t->filehandle());
 }
@@ -137,7 +139,7 @@ sub play_ttyrec {
 sub play_game {
   my ($self, $g) = @_;
 
-  my ($ttr, $offset, $frame) = tty_frame_offset($g);
+  my ($ttr, $offset, $stop_offset, $frame) = tty_frame_offset($g);
 
   $self->clear();
   $self->reset();
@@ -150,11 +152,13 @@ sub play_game {
     }
 
     eval {
-      $self->play_ttyrec($g, ttyrec_path($g, $ttyrec), $offset, $frame);
+      $self->play_ttyrec($g, ttyrec_path($g, $ttyrec), $offset,
+                         $stop_offset, $frame);
     };
     warn "$@\n" if $@;
 
     undef $offset;
+    undef $stop_offset;
     undef $frame;
   }
 }

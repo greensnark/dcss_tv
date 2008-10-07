@@ -51,8 +51,9 @@ sub get_game_matching {
   my $filter = make_filter($g);
   my @games = fetch_all_games(splat => undef);
   @games = grep(filter_matches($filter, $_), @games);
-  return $games[0] if @games;
-
+  if (@games) {
+    return $games[0];
+  }
   download_game($g)
 }
 

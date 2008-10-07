@@ -126,10 +126,10 @@ sub fetch_game {
       print "Not redownloading ttyrecs for ", desc_game($g), "\n";
     }
     else {
-      print "Downloaded ttyrecs for ", desc_game($g), "\n";
+      print "Downloaded ttyrecs for ", desc_game($g), " ($g->{ttyrecs})\n";
     }
     # If the game already has an id, it's already been registered
-    record_game($g, interesting_game($g) || 0) unless $dejafait;
+    record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
     tty_frame_offset($g, 1);
     print $client "OK " . xlog_str($g, 1) . "\n";
   } else {

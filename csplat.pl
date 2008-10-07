@@ -115,15 +115,60 @@ sub rescan_games {
 }
 
 sub purge_nonsplats {
+  print "Purging non-splat games...\n";
   my @games = fetch_all_games(splat => '');
   for my $g (@games) {
     delete_game($g);
+  }
+
+  print "Purging milestones...\n";
+  @games = fetch_all_games(splat => 'm');
+  for my $g (@games) {
+    delete_game($g);
+  }
+}
+
+sub fixup_game_table {
+  my $rows =
+    CSplat::DB::exec_query_all(
+                               'SELECT src, player, gtime, logrecord, id,
+                                       ttyrecs
+                                FROM games');
+
+  my @fixup;
+  for my $row (@$rows) {
+    if (!$row->[0] || !$row->[1] || !$row->[2]) {
+      push @fixup, [ $row->[3], $row->[4] ];
+    }
+  }
+
+  for my $row (@fixup) {
+    my $xlog = $row->[0];
+    my $id = $row->[1];
+    my $g = xlog_line($xlog);
+
+    print "Fixing null fields for game $id\n";
+    CSplat::DB::exec_query('UPDATE games SET src = ?, player = ?, gtime = ?
+                            WHERE id = ?',
+                           $g->{src}, $g->{name}, $g->{end} || $g->{time},
+                           $id);
+  }
+
+  # Register all unregistered ttyrecs.
+  for my $row (@$rows) {
+    my $ttyrecs = $row->[5];
+    my $g = xlog_line($row->[3]);
+    for my $ttyrec (split ' ', $ttyrecs) {
+      CSplat::Ttyrec::check_register_ttyrec($g, $ttyrec);
+    }
   }
 }
 
 # Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
 # will also delete games that have no death ttyrecs.
 sub sanity_check {
+  fixup_game_table();
+
   my @games = fetch_all_games(splat => 'y');
 
   if ($opt{filter}) {
@@ -203,6 +248,7 @@ sub delete_game {
   # There's a distinct time window here where we could inconvenience a parallel
   # tv player script, but that can't be helped.
   for my $ttyrec (split / /, $g->{ttyrecs}) {
+    CSplat::Ttyrec::unregister_ttyrec($g, $ttyrec);
     my $file = ttyrec_path($g, $ttyrec);
     if (-f $file) {
       print "Deleting $file\n";

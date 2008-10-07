@@ -113,43 +113,9 @@ sub create_tables {
   my $dbh = shift;
   print "Setting up splat database\n";
 
-  my @ddl_lines = (
-                   <<'T1',
-  CREATE TABLE logplace (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     logfile TEXT,
-     offset INTEGER
-  );
-T1
-                   <<'T2',
-  CREATE INDEX loff ON logplace (logfile, offset);
-T2
-                   <<'T3',
-  CREATE TABLE ttyrec (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     logrecord TEXT,
-     ttyrecs TEXT,
-     splat TEXT NOT NULL DEFAULT ''
-  );
-T3
-                   <<'T4',
-  CREATE TABLE played_games (
-     ref_id INTEGER,
-     FOREIGN KEY (ref_id) REFERENCES ttyrec (id)
-  );
-T4
-                   <<'T5',
-  CREATE TABLE ttyrec_offset (
-     id INTEGER UNIQUE,
-     ttyrec TEXT,
-     offset INTEGER,
-     frame BLOB,
-     FOREIGN KEY (id) REFERENCES ttyrec (id)
-  );
-T5
-                   );
-  for my $line (@ddl_lines) {
-    $dbh->do($line) or die "Can't create table schema!";
+  my $sql = do { local (@ARGV, $/) = 'csplat.sql'; <> };
+  for my $st (split /;/, $sql) {
+    $dbh->do($st) or die "Can't create table schema ($st)!";
   }
 }
 
@@ -158,12 +124,24 @@ sub reopen_db {
   open_db();
 }
 
+sub game_seek_multipliers {
+  my $g = shift;
+  my $preseek = int($g->{seekbefore} || 1) || 1;
+  my $postseek = int($g->{seekafter} || 1) || 1;
+  $postseek = 1 unless $g->{milestone};
+  ($preseek, $postseek)
+}
+
 sub tty_find_frame_offset {
   my $g = shift;
-  my $st = exec_query("SELECT ttyrec, offset, frame FROM ttyrec_offset
-                       WHERE id = ?", $g->{id});
+
+  my ($pre, $post) = game_seek_multipliers($g);
+  my $st = exec_query("SELECT ttyrec, offset, stop_offset, frame
+                       FROM ttyrec_offset
+                       WHERE id = ? AND seekbefore = ?
+                         AND seekafter = ?", $g->{id}, $pre, $post);
   my $row = $st->fetchrow_arrayref();
-  $row ? @$row : (undef, undef, undef)
+  $row ? @$row : (undef, undef, undef, undef)
 }
 
 sub tty_delete_frame_offset {
@@ -172,11 +150,15 @@ sub tty_delete_frame_offset {
 }
 
 sub tty_save_frame_offset {
-  my ($g, $ttr, $offset, $frame) = @_;
+  my ($g, $ttr, $offset, $stop_offset, $frame) = @_;
   tty_delete_frame_offset($g);
-  exec_query("INSERT INTO ttyrec_offset (id, ttyrec, offset, frame)
-              VALUES (?, ?, ?, ?)",
-             $g->{id}, $ttr, $offset, $frame);
+
+  my ($pre, $post) = game_seek_multipliers($g);
+  exec_query("INSERT INTO ttyrec_offset
+              (id, ttyrec, offset, stop_offset, frame, seekbefore, seekafter)
+              VALUES (?, ?, ?, ?, ?, ?, ?)",
+             $g->{id}, $ttr, $offset, $stop_offset, $frame,
+             $pre, $post);
 }
 
 sub fetch_all_games {
@@ -184,9 +166,11 @@ sub fetch_all_games {
 
   my $rows =
     defined($pars{splat})?
-      exec_query_all("SELECT id, logrecord, ttyrecs FROM ttyrec
-                      WHERE splat = ?", $pars{splat})
-        : exec_all("SELECT id, logrecord, ttyrecs FROM ttyrec");
+      exec_query_all("SELECT id, logrecord, ttyrecs FROM games
+                      WHERE etype = ?", $pars{splat})
+    # Only return milestones if the caller asks for them explicitly.
+    : exec_all("SELECT id, logrecord, ttyrecs FROM games
+                WHERE etype <> 'm'");
 
   my @games;
   for my $row (@$rows) {

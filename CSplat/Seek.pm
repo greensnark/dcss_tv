@@ -3,6 +3,7 @@ use warnings;
 
 package CSplat::Seek;
 use base 'Exporter';
+use lib '..';
 
 our @EXPORT_OK = qw/tty_frame_offset clear_screen set_buildup_size/;
 
@@ -19,6 +20,9 @@ use Carp;
 my $TERM_X = 80;
 my $TERM_Y = 24;
 my $TERM = Term::VT102::Boundless->new(cols => $TERM_X, rows => $TERM_Y);
+
+our $MS_SEEK_BEFORE = $TTYRDEFSZ;
+our $MS_SEEK_AFTER  = $TTYRDEFSZ / 2;
 
 our $BUILDUP_SIZE = $TTYRDEFSZ * 3;
 
@@ -89,26 +93,51 @@ sub tv_frame {
 
 sub tty_frame_offset {
   my ($g, $deep) = @_;
-  my ($ttr, $offset, $frame) = tty_find_frame_offset($g);
+  my ($ttr, $offset, $stop_offset, $frame) = tty_find_frame_offset($g);
   unless ($ttr && $offset && $frame) {
-    ($ttr, $offset, $frame) = tty_calc_frame_offset($g, $deep);
-    tty_save_frame_offset($g, $ttr, $offset, $frame) if $deep;
+    ($ttr, $offset, $stop_offset, $frame) = tty_calc_frame_offset($g, $deep);
+    tty_save_frame_offset($g, $ttr, $offset, $stop_offset, $frame) if $deep;
   }
-  ($ttr, $offset, $frame)
+  ($ttr, $offset, $stop_offset, $frame)
 }
 
 sub tty_calc_frame_offset {
   my ($g, $deep) = @_;
 
+  my $milestone = $g->{milestone};
   my $sz = $g->{sz};
+
+  my $end_offset;
+
+  my @ttyrecs = split / /, $g->{ttyrecs};
+
+  if ($milestone) {
+    die "Milestone has ", scalar(@ttyrecs), " ttyrecs!\n" if @ttyrecs > 1;
+
+    # Work out where exactly the milestone starts.
+    my $mtime = CSplat::Ttyrec::tty_time($g, 'time');
+    my ($start, $end, $seek_frame_offset) =
+      CSplat::Ttyrec::ttyrec_play_time($g, $ttyrecs[0], $mtime);
+
+    # The frame involving the milestone should be treated as EOF.
+    $sz = $seek_frame_offset;
+    $end_offset = $sz;
+  }
+
   my $skipsize = 0;
 
-  my $defsz = $TTYRDEFSZ;
+  my $defsz = $milestone ? $MS_SEEK_BEFORE : $TTYRDEFSZ;
 
   # Give more seekback to Zot games.
   if ($g->{place} =~ /^Zot/) {
     $defsz *= 2;
   }
+
+  my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
+  #warn "Seek before: $seekbefore, seek after: $seekafter\n";
+
+  # If the game itself requests a specific seek, oblige.
+  $defsz *= $seekbefore if $seekbefore;
 
   if ($sz > $defsz) {
     $skipsize = $sz - $defsz;
@@ -122,17 +151,28 @@ sub tty_calc_frame_offset {
       next;
     }
 
-    return tty_calc_offset_in($g, $deep, $ttyrec, $sz, $skipsize);
+    my $ignore_hp = $milestone;
+
+    my ($ttr, $offset, $stop_offset, $frame) =
+      tty_calc_offset_in($g, $deep, $ttyrec, $sz, $skipsize, $ignore_hp);
+
+    # Seek won't presume to set an end offset, so do so here.
+    if ($milestone && !defined($stop_offset) && defined($end_offset)) {
+      my $endpad = $MS_SEEK_AFTER;
+      $endpad *= $seekafter if $seekafter;
+      $stop_offset = $end_offset + $endpad;
+    }
+    return ($ttr, $offset, $stop_offset, $frame);
   }
   confess "Argh, wtf?\n";
   # WTF?
-  (undef, undef, undef)
+  (undef, undef, undef, undef)
 }
 
 sub tty_calc_offset_in {
-  my ($g, $deep, $ttr, $rsz, $skipsz) = @_;
+  my ($g, $deep, $ttr, $rsz, $skipsz, $ignore_hp) = @_;
   if ($deep) {
-    tty_find_offset_deep($g, $ttr, $rsz, $skipsz)
+    tty_find_offset_deep($g, $ttr, $rsz, $skipsz, $ignore_hp)
   }
   else {
     tty_find_offset_simple($g, $ttr, $rsz, $skipsz)
@@ -151,7 +191,7 @@ sub frame_full_hp {
 # Deep seek strategy: Look for last frame where the character had full health,
 # but don't go back farther than $TTYRDEFSZ * 2.
 sub tty_find_offset_deep {
-  my ($g, $ttyrec, $tsz, $skip) = @_;
+  my ($g, $ttyrec, $tsz, $skip, $ignore_hp) = @_;
 
   print "Deep scanning for start frame for\n" . desc_game_brief($g) . "\n";
   local $| = 1;
@@ -195,20 +235,21 @@ sub tty_find_offset_deep {
 
     $building = 1 if !$building && defined $lastgoodclear;
 
-    print "Examining frame $frame ($pos / $size)\r" unless $frame % 13;
+    print "Examining frame $frame ($pos / $size)\r" unless $frame % 3031;
 
     if ($building) {
       tv_cache_frame(tv_frame_strip($fref->{data}));
-      my ($type, $hp, $maxhp) = frame_full_hp();
-      if ($type
-          && ($type > $best_type || ($type == $best_type && $hp >= $best_hp)))
-      {
-        $best_type = $type;
-        $best_hp = $hp;
-        $best_maxhp = $maxhp;
+      unless ($ignore_hp) {
+        my ($type, $hp, $maxhp) = frame_full_hp();
+        if ($type
+            && ($type > $best_type || ($type == $best_type && $hp >= $best_hp))) {
+          $best_type = $type;
+          $best_hp = $hp;
+          $best_maxhp = $maxhp;
 
-        $last_full_hp = $pos;
-        $last_full_hp_frame = tv_frame();
+          $last_full_hp = $pos;
+          $last_full_hp_frame = tv_frame();
+        }
       }
     }
 
@@ -234,12 +275,12 @@ sub tty_find_offset_deep {
         return ($ttyrec, $last_full_hp, $last_full_hp_frame);
       }
       print "\nReturning frame at default seek\n";
-      return ($ttyrec, $pos, tv_frame());
+      return ($ttyrec, $pos, undef, tv_frame());
     }
     $prev_frame = $pos;
   }
-  die "Unexpected end of ttyrec $ttyrec\n";
-  (undef, undef, undef)
+  warn "Unexpected end of ttyrec $ttyrec\n";
+  (undef, undef, undef, undef)
 }
 
 # This is the lightweight seek strategy. Can be used for on-the-fly seeking.
@@ -294,16 +335,16 @@ sub tty_find_offset_simple {
         # If we've been building up a frame in our VT102, spit that out now.
         if ($buildup_from && $buildup_from < $pos) {
           close($t->filehandle());
-          return ($ttyrec, $pos, tv_frame());
+          return ($ttyrec, $pos, undef, tv_frame());
         }
         next;
       }
     }
     close($t->filehandle());
-    return ($ttyrec, $prev_frame, '');
+    return ($ttyrec, $prev_frame, undef, '');
   }
   # If we get here, ouch.
-  (undef, undef, undef)
+  (undef, undef, undef, undef)
 }
 
 1
