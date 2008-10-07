@@ -245,16 +245,8 @@ sub delete_game {
   my $g = shift;
   print "Discarding game: ", desc_game($g), "\n";
 
-  # There's a distinct time window here where we could inconvenience a parallel
-  # tv player script, but that can't be helped.
-  for my $ttyrec (split / /, $g->{ttyrecs}) {
-    CSplat::Ttyrec::unregister_ttyrec($g, $ttyrec);
-    my $file = ttyrec_path($g, $ttyrec);
-    if (-f $file) {
-      print "Deleting $file\n";
-      unlink $file;
-    }
-  }
+  # Don't delete ttyrecs yet - they could be used by multiple entries.
+
   exec_query("DELETE FROM games WHERE id = ?", $g->{id});
   $g->{deleted} = 'y';
 }
