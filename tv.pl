@@ -145,7 +145,7 @@ sub run_tv {
 # Perform a last-minute check to see if the game is still there.
 sub tv_game_exists {
   my $g = shift;
-  query_one("SELECT COUNT(*) FROM ttyrec WHERE id = ?", $g->{id})
+  query_one("SELECT COUNT(*) FROM games WHERE id = ?", $g->{id})
 }
 
 
