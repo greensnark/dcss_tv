@@ -69,7 +69,11 @@ sub next_request {
     };
     warn "$@" if $@;
     if ($line =~ /^\d+ (.*)/) {
-      return xlog_line($1);
+      my $g = xlog_line($1);
+      # The id here will be Henzell's game id, which is sharply distinct
+      # from our own game id, so toss it.
+      delete $$g{id};
+      return $g
     }
   }
 }

@@ -259,6 +259,11 @@ sub register_ttyrec {
   my ($start, $end, $seek_offset) = ttyrec_play_time($g, $ttyrec, $seektime);
 
   eval {
+    # First kill any existing registration.
+    exec_query('DELETE FROM ttyrec WHERE ttyrec = ?', $ttyrec);
+  };
+
+  eval {
     exec_query('INSERT INTO ttyrec (ttyrec, src, player, stime, etime)
                 VALUES (?, ?, ?, ?, ?)',
                $ttyrec, $g->{src}, $g->{name}, $start, $end);
