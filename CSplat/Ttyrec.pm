@@ -284,7 +284,7 @@ sub record_fetched_game {
 
 sub update_fetched_games {
   %FETCHED_GAMES = ();
-  my @games = fetch_all_games();
+  my @games = fetch_all_games(splat => '*');
   for my $g (@games) {
     record_fetched_game($g);
   }

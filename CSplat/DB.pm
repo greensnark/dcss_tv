@@ -164,13 +164,17 @@ sub tty_save_frame_offset {
 sub fetch_all_games {
   my %pars = @_;
 
+  my $all = $pars{splat} && $pars{splat} eq '*';
+  delete $pars{splat} if $all;
+
   my $rows =
     defined($pars{splat})?
       exec_query_all("SELECT id, logrecord, ttyrecs FROM games
-                      WHERE etype = ?", $pars{splat})
+                      WHERE etype = ?", $pars{splat}) :
+    $all? exec_all("SELECT id, logrecord, ttyrecs FROM games") :
     # Only return milestones if the caller asks for them explicitly.
-    : exec_all("SELECT id, logrecord, ttyrecs FROM games
-                WHERE etype <> 'm'");
+    exec_all("SELECT id, logrecord, ttyrecs FROM games
+              WHERE etype <> 'm'");
 
   my @games;
   for my $row (@$rows) {

@@ -11,7 +11,7 @@ use CSplat::DB qw/tty_find_frame_offset tty_save_frame_offset/;
 use CSplat::Ttyrec qw/ttyrec_path $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
 use CSplat::Xlog qw/desc_game_brief/;
 
-use Term::VT102::Boundless;
+use Term::VT102;
 use Term::TtyRec::Plus;
 use Fcntl qw/SEEK_SET/;
 use Carp;
@@ -19,7 +19,7 @@ use Carp;
 # A standard VT102 to grab frames from.
 my $TERM_X = 80;
 my $TERM_Y = 24;
-my $TERM = Term::VT102::Boundless->new(cols => $TERM_X, rows => $TERM_Y);
+my $TERM = Term::VT102->new(cols => $TERM_X, rows => $TERM_Y);
 
 our $MS_SEEK_BEFORE = $TTYRDEFSZ;
 our $MS_SEEK_AFTER  = $TTYRDEFSZ / 2;
