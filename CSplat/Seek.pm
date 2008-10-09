@@ -43,6 +43,7 @@ sub clear_screen {
 sub tv_cache_reset {
   $TERM->reset();
   $TERM->resize($TERM_X, $TERM_Y);
+  $TERM->process(clear_screen() . "\e[c");
 }
 
 sub tv_cache_frame {
