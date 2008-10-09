@@ -41,7 +41,7 @@ sub new {
 sub clear {
   my $self = shift;
   $self->connect();
-  $self->write("\e[2J");
+  $self->write("\e[2J\e[c");
 }
 
 sub reset {
