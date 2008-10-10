@@ -190,7 +190,7 @@ sub request_tv {
     my $last_msg = 0;
     my $countup;
     while (1) {
-      if (@queued_fetch) {
+      while (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
         if (($f->{cancel} || '') eq 'y') {
           if ($f->{nuke}) {
