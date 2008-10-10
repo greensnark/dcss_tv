@@ -328,6 +328,7 @@ sub fetch_ttyrecs {
       # Early exit.
       $g->{ttyrecs} = $ttyrec;
       $g->{ttyrecurls} = \@ttyrecs;
+      $g->{sz} = -s(ttyrec_path($g, $ttyrec));
       return $g;
     }
   }
