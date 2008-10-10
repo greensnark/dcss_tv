@@ -144,19 +144,20 @@ sub tv_show_playlist {
 
 sub cancel_playing_games {
   if (@stop_list) {
+    my @stop = @stop_list;
+    @stop_list = ();
+
     my $g = shift;
 
-    if (grep /nuke=y/, @stop_list) {
+    if (grep /nuke=y/, @stop) {
       return 'stop';
     }
 
-    my @filters = map(CSplat::Select::make_filter(xlog_line($_)), @stop_list);
+    my @filters = map(CSplat::Select::make_filter(xlog_line($_)), @stop);
 
     if (grep(CSplat::Select::filter_matches($_, $g), @filters)) {
       return 'stop';
     }
-
-    @stop_list = ();
   }
 }
 
