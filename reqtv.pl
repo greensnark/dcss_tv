@@ -79,8 +79,11 @@ sub next_request {
   $g->{end} = $g->{rend};
   $g->{time} = $g->{rtime};
 
+  $g->{cancel} = 'y' if ($g->{nuke} || '') eq 'y';
+
   if (($g->{cancel} || '') eq 'y') {
     my $filter = CSplat::Select::make_filter($g);
+    $filter = { } if $g->{nuke};
     @queued_playback =
       grep(!CSplat::Select::filter_matches($filter, xlog_line($_)),
            @queued_playback);
@@ -142,6 +145,11 @@ sub tv_show_playlist {
 sub cancel_playing_games {
   if (@stop_list) {
     my $g = shift;
+
+    if (grep /nuke=y/, @stop_list) {
+      return 'stop';
+    }
+
     my @filters = map(CSplat::Select::make_filter(xlog_line($_)), @stop_list);
 
     if (grep(CSplat::Select::filter_matches($_, $g), @filters)) {
@@ -184,8 +192,13 @@ sub request_tv {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
         if (($f->{cancel} || '') eq 'y') {
-          $TV->write("\e[1;35mCancel by $f->{req}\e[0m\r\n",
-                     desc_game_brief($f), "\r\n");
+          if ($f->{nuke}) {
+            $TV->write("\e[1;35mPlaylist clear by $f->{req}\e[0m\r\n");
+          }
+          else {
+            $TV->write("\e[1;35mCancel by $f->{req}\e[0m\r\n",
+                       desc_game_brief($f), "\r\n");
+          }
           $last_msg = $slept;
         }
         elsif ($f->{failed}) {
