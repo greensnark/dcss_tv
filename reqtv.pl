@@ -179,6 +179,7 @@ sub request_tv {
 
     my $slept = 0;
     my $last_msg = 0;
+    my $countup;
     while (1) {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
@@ -198,6 +199,7 @@ sub request_tv {
           $TV->write("\r\nPlease wait, fetching game...\r\n");
           undef $last_msg;
         }
+        $countup = 1;
       }
 
       if (@queued_playback) {
@@ -207,7 +209,7 @@ sub request_tv {
         last;
       }
 
-      ++$slept;
+      ++$slept if $countup;
       next RELOOP if $last_msg && $slept - $last_msg > 20;
       sleep 1;
     }
