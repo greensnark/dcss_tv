@@ -133,6 +133,8 @@ sub cap_game_seek {
 
 sub _safenum {
   my $s = shift;
+
+  $s = '' unless defined $s;
   return -1 if $s eq '$';
   return 0 if $s eq '0';
 
