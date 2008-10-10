@@ -26,6 +26,7 @@ my %opt;
 
 my @queued_fetch : shared;
 my @queued_playback : shared;
+my @stop_list : shared;
 
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'local-request');
@@ -78,14 +79,26 @@ sub next_request {
   $g->{end} = $g->{rend};
   $g->{time} = $g->{rtime};
 
-  push @queued_fetch, xlog_str($g);
-  my $game = get_game_matching($g);
-  if ($game) {
-    $game->{req} = $g->{req};
-    push @queued_playback, xlog_str($game, 1);
-  } else {
-    $g->{failed} = 1;
+  if (($g->{cancel} || '') eq 'y') {
+    my $filter = CSplat::Select::make_filter($g);
+    @queued_playback =
+      grep(!CSplat::Select::filter_matches($filter, xlog_line($_)),
+           @queued_playback);
+
+    warn "Adding ", desc_game($g), " to stop list\n";
+    push @stop_list, xlog_str($g);
     push @queued_fetch, xlog_str($g);
+  }
+  else {
+    push @queued_fetch, xlog_str($g);
+    my $game = get_game_matching($g);
+    if ($game) {
+      $game->{req} = $g->{req};
+      push @queued_playback, xlog_str($game, 1);
+    } else {
+      $g->{failed} = 1;
+      push @queued_fetch, xlog_str($g);
+    }
   }
 }
 
@@ -126,6 +139,19 @@ sub tv_show_playlist {
   }
 }
 
+sub cancel_playing_games {
+  if (@stop_list) {
+    my $g = shift;
+    my @filters = map(CSplat::Select::make_filter(xlog_line($_)), @stop_list);
+
+    if (grep(CSplat::Select::filter_matches($_, $g), @filters)) {
+      return 'stop';
+    }
+
+    @stop_list = ();
+  }
+}
+
 sub request_tv {
   my $last_game;
 
@@ -133,6 +159,8 @@ sub request_tv {
 
   my $rcheck = threads->new(\&check_requests);
   $rcheck->detach;
+
+  $TV->callback(\&cancel_playing_games);
 
  RELOOP:
   while (1) {
@@ -150,21 +178,26 @@ sub request_tv {
     $TV->write("\r\n\r\n");
 
     my $slept = 0;
-    my $failed;
-    my $req_seen;
+    my $last_msg = 0;
     while (1) {
       if (@queued_fetch) {
         my $f = xlog_line(shift(@queued_fetch));
-        if ($f->{failed}) {
-          $TV->write("Failed to fetch game:\r\n", desc_game_brief($f), "\r\n");
-          $failed = 1;
-          $slept = 1;
+        if (($f->{cancel} || '') eq 'y') {
+          $TV->write("\e[1;35mCancel by $f->{req}\e[0m\r\n",
+                     desc_game_brief($f), "\r\n");
+          $last_msg = $slept;
+        }
+        elsif ($f->{failed}) {
+          $TV->write("\e[1;31mFailed to fetch game:\e[0m\r\n",
+                     desc_game_brief($f), "\r\n");
+          $last_msg = $slept;
         }
         else {
-          $TV->write("Request by $$f{req}:\r\n", desc_game_brief($f), "\r\n");
-          $TV->write("Please wait, fetching game...\r\n");
+          $TV->write("\e[1;34mRequest by $$f{req}:\e[0m\r\n",
+                     desc_game_brief($f), "\r\n");
+          $TV->write("\r\nPlease wait, fetching game...\r\n");
+          undef $last_msg;
         }
-        $req_seen = 1;
       }
 
       if (@queued_playback) {
@@ -174,15 +207,17 @@ sub request_tv {
         last;
       }
 
-      ++$slept if $req_seen;
-      next RELOOP if $slept > 20 && $failed;
+      ++$slept;
+      next RELOOP if $last_msg && $slept - $last_msg > 20;
       sleep 1;
     }
 
     my $line = shift(@queued_playback);
-    my $g = xlog_line($line);
-    $TV->play_game($g);
-    $last_game = $g;
+    if ($line) {
+      my $g = xlog_line($line);
+      $TV->play_game($g);
+      $last_game = $g;
+    }
   }
 }
 

@@ -135,10 +135,13 @@ sub tty_calc_frame_offset {
   }
 
   my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
-  #warn "Seek before: $seekbefore, seek after: $seekafter\n";
 
   # If the game itself requests a specific seek, oblige.
-  $defsz *= $seekbefore if $seekbefore;
+  $defsz *= $seekbefore;
+
+  my $delbuildup = $BUILDUP_SIZE - $TTYRDEFSZ;
+
+  local $BUILDUP_SIZE = $defsz + $delbuildup;
 
   if ($sz > $defsz) {
     $skipsize = $sz - $defsz;
@@ -158,7 +161,9 @@ sub tty_calc_frame_offset {
       tty_calc_offset_in($g, $deep, $ttyrec, $sz, $skipsize, $ignore_hp);
 
     # Seek won't presume to set an end offset, so do so here.
-    if ($milestone && !defined($stop_offset) && defined($end_offset)) {
+    if ($milestone && !defined($stop_offset) && defined($end_offset)
+        && $seekafter != -1)
+    {
       my $endpad = $MS_SEEK_AFTER;
       $endpad *= $seekafter if $seekafter;
       $stop_offset = $end_offset + $endpad;

@@ -25,7 +25,8 @@ sub xlog_line {
 }
 
 sub escape_xlogfield {
-  my $field = shift() || '';
+  my $field = shift();
+  $field = '' unless defined($field);
   $field =~ s/:/::/g;
   $field
 }

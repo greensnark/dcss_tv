@@ -54,7 +54,7 @@ sub make_filter {
   my @keys = keys %$filter;
 
   my @goodkeys = qw/name start end god vmsg tmsg place ktyp title
-                    xl char turn/;
+                    xl char turn time/;
   my %good = map(($_ => 1), @goodkeys);
 
   for my $key (@keys) {

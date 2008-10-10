@@ -124,11 +124,32 @@ sub reopen_db {
   open_db();
 }
 
+sub cap_game_seek {
+  my ($v, $min, $max) = @_;
+  $v = $min if $v < $min;
+  $v = $max if $v > $max;
+  $v
+}
+
+sub _safenum {
+  my $s = shift;
+  return -1 if $s eq '$';
+  return 0 if $s eq '0';
+
+  no warnings 'numeric';
+  int($s || 1) || 1;
+}
+
 sub game_seek_multipliers {
   my $g = shift;
-  my $preseek = int($g->{seekbefore} || 1) || 1;
-  my $postseek = int($g->{seekafter} || 1) || 1;
+
+  my $preseek = _safenum($g->{seekbefore});
+  my $postseek = _safenum($g->{seekafter});
   $postseek = 1 unless $g->{milestone};
+
+  $preseek = cap_game_seek($preseek, 0, 9);
+  $postseek = cap_game_seek($postseek, -1, 9);
+
   ($preseek, $postseek)
 }
 
@@ -151,14 +172,16 @@ sub tty_delete_frame_offset {
 
 sub tty_save_frame_offset {
   my ($g, $ttr, $offset, $stop_offset, $frame) = @_;
-  tty_delete_frame_offset($g);
-
   my ($pre, $post) = game_seek_multipliers($g);
-  exec_query("INSERT INTO ttyrec_offset
-              (id, ttyrec, offset, stop_offset, frame, seekbefore, seekafter)
-              VALUES (?, ?, ?, ?, ?, ?, ?)",
-             $g->{id}, $ttr, $offset, $stop_offset, $frame,
-             $pre, $post);
+
+  if ($pre == 1 && $post == 1) {
+    tty_delete_frame_offset($g);
+    exec_query("INSERT INTO ttyrec_offset
+                (id, ttyrec, offset, stop_offset, frame, seekbefore, seekafter)
+                VALUES (?, ?, ?, ?, ?, ?, ?)",
+               $g->{id}, $ttr, $offset, $stop_offset, $frame,
+               $pre, $post);
+  }
 }
 
 sub fetch_all_games {
