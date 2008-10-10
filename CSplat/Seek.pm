@@ -162,7 +162,7 @@ sub tty_calc_frame_offset {
 
     # Seek won't presume to set an end offset, so do so here.
     if ($milestone && !defined($stop_offset) && defined($end_offset)
-        && $seekafter != -1)
+        && $seekafter != -100)
     {
       my $endpad = $MS_SEEK_AFTER;
       $endpad *= $seekafter if $seekafter;

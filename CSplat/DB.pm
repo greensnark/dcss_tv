@@ -135,7 +135,7 @@ sub _safenum {
   my $s = shift;
 
   $s = '' unless defined $s;
-  return -1 if $s eq '$';
+  return -100 if $s eq '$';
   return 0 if $s eq '0';
 
   no warnings 'numeric';
@@ -149,8 +149,8 @@ sub game_seek_multipliers {
   my $postseek = _safenum($g->{seekafter});
   $postseek = 1 unless $g->{milestone};
 
-  $preseek = cap_game_seek($preseek, 0, 9);
-  $postseek = cap_game_seek($postseek, -1, 9);
+  $preseek = cap_game_seek($preseek, -20, 20);
+  $postseek = cap_game_seek($postseek, -20, 20);
 
   ($preseek, $postseek)
 }
