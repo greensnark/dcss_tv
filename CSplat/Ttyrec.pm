@@ -312,7 +312,7 @@ sub fetch_ttyrecs {
     my $clone = { %$fetched };
     delete $$clone{seekbefore};
     delete $$clone{seekafter};
-    return xlog_merge($g, $fetched);
+    return xlog_merge($g, $clone);
   }
 
   my $start = tty_time($g, 'start');
