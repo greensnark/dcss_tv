@@ -280,7 +280,7 @@ sub tty_find_offset_deep {
           ", avg wanted: $TTYRDEFSZ)!\n";
         return ($ttyrec, $last_full_hp, undef, $last_full_hp_frame);
       }
-      print "\nReturning frame at default seek\n";
+      print "\nReturning frame at default seek ($pos / $tsz)\n";
       return ($ttyrec, $pos, undef, tv_frame());
     }
     $prev_frame = $pos;
