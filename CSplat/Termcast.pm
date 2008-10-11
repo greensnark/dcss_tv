@@ -161,6 +161,9 @@ sub play_game {
 
   my ($ttr, $offset, $stop_offset, $frame) = tty_frame_offset($g);
 
+  $stop_offset ||= 0;
+  print "Ttyrec bounds: $offset -> $stop_offset\n";
+
   $self->clear();
   $self->reset();
 
