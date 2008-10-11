@@ -141,11 +141,18 @@ sub play_ttyrec {
     if ($self->{_callbacks}) {
       for my $cb (@{$self->{_callbacks}}) {
         my $res = $cb->($g);
-        last PLAYBACK if ($res || '') eq 'stop';
+        if (($res || '') eq 'stop') {
+          print "Callback requested end of playback, obliging.\n";
+          last PLAYBACK;
+        }
       }
     }
-    last if $stop_offset && tell($t->filehandle()) >= $stop_offset;
+    if ($stop_offset && tell($t->filehandle()) >= $stop_offset) {
+      print "Stop offset $stop_offset reached, stopping\n";
+      last;
+    }
   }
+  print "Done playback.\n";
   close($t->filehandle());
 }
 
