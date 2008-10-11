@@ -309,6 +309,9 @@ sub fetch_ttyrecs {
   # Check if we already have the game.
   my $fetched = game_was_fetched($g);
   if ($fetched) {
+    my $clone = { %$fetched };
+    delete $$clone{seekbefore};
+    delete $$clone{seekafter};
     return xlog_merge($g, $fetched);
   }
 
