@@ -164,6 +164,7 @@ sub tty_calc_frame_offset {
     if ($milestone && !defined($stop_offset) && defined($end_offset)
         && $seekafter != -100)
     {
+      print "Seek after: $seekafter\n";
       my $endpad = $MS_SEEK_AFTER;
       $endpad *= $seekafter if $seekafter;
       $stop_offset = $end_offset + $endpad;
