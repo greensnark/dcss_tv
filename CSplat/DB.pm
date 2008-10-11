@@ -126,7 +126,7 @@ sub reopen_db {
 
 sub cap_game_seek {
   my ($v, $min, $max) = @_;
-  $v = $min if $v < $min;
+  $v = $min if $v < $min && $v != -100;
   $v = $max if $v > $max;
   $v
 }
@@ -149,6 +149,7 @@ sub game_seek_multipliers {
   my $postseek = _safenum($g->{seekafter});
   $postseek = 1 unless $g->{milestone};
 
+  print "pre: $preseek, post: $postseek\n";
   $preseek = cap_game_seek($preseek, -20, 20);
   $postseek = cap_game_seek($postseek, -20, 20);
 
