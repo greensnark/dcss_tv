@@ -149,11 +149,20 @@ sub game_seek_multipliers {
   my $postseek = _safenum($g->{seekafter});
   $postseek = 1 unless $g->{milestone};
 
-  print "pre: $preseek, post: $postseek\n";
   $preseek = cap_game_seek($preseek, -20, 20);
   $postseek = cap_game_seek($postseek, -20, 20);
 
   ($preseek, $postseek)
+}
+
+sub delete_game {
+  my $g = shift;
+  print "Discarding game: ", CSplat::Xlog::desc_game($g), "\n";
+
+  # Don't delete ttyrecs yet - they could be used by multiple entries.
+
+  exec_query("DELETE FROM games WHERE id = ?", $g->{id});
+  $g->{deleted} = 'y';
 }
 
 sub tty_find_frame_offset {

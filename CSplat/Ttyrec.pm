@@ -248,6 +248,8 @@ sub ttyrec_play_time {
   };
   warn "$@" if $@;
 
+  return (undef, undef, undef) unless defined $first_ts;
+
   my $delta = int($last_ts - $first_ts);
   my $end = DateCalc($start, "+ $delta seconds");
 

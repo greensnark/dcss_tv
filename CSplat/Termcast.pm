@@ -159,10 +159,17 @@ sub play_ttyrec {
 sub play_game {
   my ($self, $g) = @_;
 
-  my ($ttr, $offset, $stop_offset, $frame) = tty_frame_offset($g);
+  my ($ttr, $offset, $stop_offset, $frame) =
+    eval {
+      tty_frame_offset($g)
+    };
+
+  if ($@) {
+    $self->clear();
+    $self->write("Ttyrec appears corrupted.");
+  }
 
   $stop_offset ||= 0;
-  print "Ttyrec bounds: $offset -> $stop_offset\n";
 
   $self->clear();
   $self->reset();

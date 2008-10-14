@@ -120,6 +120,8 @@ sub tty_calc_frame_offset {
     my ($start, $end, $seek_frame_offset) =
       CSplat::Ttyrec::ttyrec_play_time($g, $ttyrecs[0], $mtime);
 
+    die "Broken ttyrec\n" unless defined($start) && defined($end);
+
     # The frame involving the milestone should be treated as EOF.
     $sz = $seek_frame_offset;
     $end_offset = $sz;

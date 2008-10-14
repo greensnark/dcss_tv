@@ -91,7 +91,7 @@ sub sanity_check_pred {
   if ($cond) {
     warn "\n$msg: ", desc_game($g), "\n";
     if ($opt{'sanity-fix'}) {
-      delete_game($g);
+      CSplat::DB::delete_game($g);
     }
   }
   $cond
@@ -106,7 +106,7 @@ sub rescan_games {
     sub {
       for my $g (@games) {
         if (!interesting_game($g)) {
-          delete_game($g);
+          CSplat::DB::delete_game($g);
         }
       }
 
@@ -118,13 +118,13 @@ sub purge_nonsplats {
   print "Purging non-splat games...\n";
   my @games = fetch_all_games(splat => '');
   for my $g (@games) {
-    delete_game($g);
+    CSplat::DB::delete_game($g);
   }
 
   print "Purging milestones...\n";
   @games = fetch_all_games(splat => 'm');
   for my $g (@games) {
-    delete_game($g);
+    CSplat::DB::delete_game($g);
   }
 }
 
@@ -239,16 +239,6 @@ sub migrate_paths {
       }
     }
   }
-}
-
-sub delete_game {
-  my $g = shift;
-  print "Discarding game: ", desc_game($g), "\n";
-
-  # Don't delete ttyrecs yet - they could be used by multiple entries.
-
-  exec_query("DELETE FROM games WHERE id = ?", $g->{id});
-  $g->{deleted} = 'y';
 }
 
 sub log_path {

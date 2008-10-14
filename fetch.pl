@@ -143,8 +143,17 @@ sub fetch_game {
     }
     # If the game already has an id, it's already been registered
     record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
-    tty_frame_offset($g, 1);
-    print $client "OK " . xlog_str($g, 1) . "\n";
+    eval {
+      tty_frame_offset($g, 1);
+    };
+    if ($@) {
+      CSplat::DB::delete_game($g);
+      warn $@;
+      print $client "FAIL $@\n";
+    }
+    else {
+      print $client "OK " . xlog_str($g, 1) . "\n";
+    }
   } else {
     print "Failed to download ", desc_game($g), "\n";
     print $client "FAIL\n";
