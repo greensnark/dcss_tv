@@ -401,7 +401,7 @@ sub fetch_ttyrec_urls_from_server {
   my $cache = $CACHED_TTYREC_URLS{$userpath};
   return @{$cache->[1]} if $cache && $cache->[0] >= $time_wanted;
 
-  notify_fetch_listeners("Fetching ttyrec listing from " . $userpath);
+  notify_fetch_listeners("Fetching ttyrec listing from " . $userpath . "...");
 
   my $listing = get($userpath) or return ();
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
