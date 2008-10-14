@@ -43,6 +43,21 @@ my $GZX = 6.6;
 my %CACHED_TTYREC_URLS;
 my %FETCHED_GAMES;
 
+my @FETCH_LISTENERS;
+
+sub add_fetch_listener {
+  push @FETCH_LISTENERS, @_;
+}
+
+sub clear_fetch_listeners {
+  @FETCH_LISTENERS = ();
+}
+
+sub notify_fetch_listeners {
+  warn "Notify: ", @_, "\n";
+  $_->(@_) for @FETCH_LISTENERS;
+}
+
 sub url_file {
   my $url = shift;
   my ($file) = $url =~ m{.*/(.*)};
@@ -155,6 +170,7 @@ sub download_ttyrecs {
   print "Downloading ", scalar(@tofetch), " ttyrecs for ", desc_game($g), "\n";
   $sz = 0;
   for my $url (@tofetch) {
+    notify_fetch_listeners("Downloading $url->{u}...");
     my $path = ttyrec_path($g, $url->{u});
     fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
     uncompress_ttyrec($g, $url);
@@ -166,7 +182,7 @@ sub download_ttyrecs {
     for my $ttyrec (@tofetch) {
       unlink ttyrec_path($g, $ttyrec->{u});
     }
-    warn "Game has no death ttyrec: ", desc_game($g), "\n";
+    notify_fetch_listeners("Game has no death ttyrec: " . desc_game($g));
     return undef;
   }
 
@@ -385,7 +401,8 @@ sub fetch_ttyrec_urls_from_server {
   my $cache = $CACHED_TTYREC_URLS{$userpath};
   return @{$cache->[1]} if $cache && $cache->[0] >= $time_wanted;
 
-  print "Fetching ttyrec listing for $name\n";
+  notify_fetch_listeners("Fetching ttyrec listing from " . $userpath);
+
   my $listing = get($userpath) or return ();
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
   my @urls;
@@ -512,19 +529,27 @@ sub request_cache_clear {
 }
 
 sub request_download {
-  my $g = shift;
-  fetch_request( sub { send_download_request(shift, $g) } )
+  my ($g, $listener) = @_;
+  fetch_request( sub { send_download_request(shift, $g, $listener) } )
 }
 
 sub send_download_request {
-  my ($sock, $g) = @_;
+  my ($sock, $g, $listener) = @_;
   print $sock "G " . xlog_str($g) . "\n";
-  my $response = <$sock>;
-  return undef unless ($response || '') =~ /OK/;
 
-  chomp $response;
-  my ($xlog) = $response =~ /^OK (.*)/;
-  xlog_merge($g, xlog_line($xlog));
+  while (my $response = <$sock>) {
+    if ($response =~ /^S (.*)/) {
+      chomp(my $text = $1);
+      $listener->($text) if $listener;
+      next;
+    }
+
+    return undef unless ($response || '') =~ /OK/;
+
+    chomp $response;
+    my ($xlog) = $response =~ /^OK (.*)/;
+    xlog_merge($g, xlog_line($xlog));
+  }
   1
 }
 

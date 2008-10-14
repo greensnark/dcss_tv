@@ -49,13 +49,12 @@ my $TV = CSplat::Termcast->new(name => 'FooTV',
 
 sub get_game_matching {
   my $g = shift;
-  my $filter = make_filter($g);
-  my @games = fetch_all_games(splat => undef);
-  @games = grep(filter_matches($filter, $_), @games);
-  if (@games) {
-    return $games[0];
-  }
   download_game($g)
+}
+
+sub download_notifier {
+  my $msg = shift;
+  push @queued_fetch, "msg: $msg";
 }
 
 sub download_game {
@@ -66,7 +65,7 @@ sub download_game {
 
   $g->{nostart} = 'y';
   $g->{nocheck} = 'y';
-  return undef unless request_download($g);
+  return undef unless request_download($g, \&download_notifier);
   delete @$g{qw/nostart nocheck/};
   $g
 }
@@ -161,6 +160,38 @@ sub cancel_playing_games {
   }
 }
 
+sub update_status {
+  my ($line, $rlmsg, $slept, $rcountup) = @_;
+  my $xlog = $line !~ /^msg: /;
+
+  if ($xlog) {
+    my $f = xlog_line($line);
+    if (($f->{cancel} || '') eq 'y') {
+      if ($f->{nuke}) {
+        $TV->write("\e[1;35mPlaylist clear by $f->{req}\e[0m\r\n");
+      } else {
+        $TV->write("\e[1;35mCancel by $f->{req}\e[0m\r\n",
+                   desc_game_brief($f), "\r\n");
+      }
+      $$rlmsg = $slept + 1;
+    } elsif ($f->{failed}) {
+      $TV->write("\e[1;31mFailed to fetch game:\e[0m\r\n",
+                 desc_game_brief($f), "\r\n");
+      $$rlmsg = $slept + 1;
+    } else {
+      $TV->write("\e[1;34mRequest by $$f{req}:\e[0m\r\n",
+                 desc_game_brief($f), "\r\n");
+      $TV->write("\r\nPlease wait, fetching game...\r\n");
+      undef $$rlmsg;
+    }
+    $$rcountup = 1;
+  }
+  else {
+    ($line) = $line =~ /^msg: (.*)/;
+    $TV->write("$line\r\n");
+  }
+}
+
 sub request_tv {
   my $last_game;
 
@@ -191,29 +222,7 @@ sub request_tv {
     my $countup;
     while (1) {
       while (@queued_fetch) {
-        my $f = xlog_line(shift(@queued_fetch));
-        if (($f->{cancel} || '') eq 'y') {
-          if ($f->{nuke}) {
-            $TV->write("\e[1;35mPlaylist clear by $f->{req}\e[0m\r\n");
-          }
-          else {
-            $TV->write("\e[1;35mCancel by $f->{req}\e[0m\r\n",
-                       desc_game_brief($f), "\r\n");
-          }
-          $last_msg = $slept;
-        }
-        elsif ($f->{failed}) {
-          $TV->write("\e[1;31mFailed to fetch game:\e[0m\r\n",
-                     desc_game_brief($f), "\r\n");
-          $last_msg = $slept;
-        }
-        else {
-          $TV->write("\e[1;34mRequest by $$f{req}:\e[0m\r\n",
-                     desc_game_brief($f), "\r\n");
-          $TV->write("\r\nPlease wait, fetching game...\r\n");
-          undef $last_msg;
-        }
-        $countup = 1;
+        update_status(shift(@queued_fetch), \$last_msg, $slept, \$countup);
       }
 
       if (@queued_playback) {

@@ -120,10 +120,22 @@ sub process_command {
   }
 }
 
+sub fetch_notifier {
+  my ($client, $g, @event) = @_;
+  my $text = join(" ", @event);
+  eval {
+    print $client "S $text\n";
+  };
+  warn $@ if $@;
+}
+
 sub fetch_game {
   my ($client, $g) = @_;
 
   print "Requested download: $g\n";
+
+  CSplat::Ttyrec::clear_fetch_listeners();
+  CSplat::Ttyrec::add_fetch_listener(sub { fetch_notifier($client, $g, @_) });
 
   $g = xlog_line($g);
 
@@ -143,6 +155,8 @@ sub fetch_game {
     }
     # If the game already has an id, it's already been registered
     record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
+
+    CSplat::Ttyrec::notify_fetch_listeners("Searching ttyrec for start frame.");
     eval {
       tty_frame_offset($g, 1);
     };
@@ -158,4 +172,5 @@ sub fetch_game {
     print "Failed to download ", desc_game($g), "\n";
     print $client "FAIL\n";
   }
+  CSplat::Ttyrec::clear_fetch_listeners();
 }
