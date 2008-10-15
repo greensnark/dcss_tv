@@ -476,11 +476,23 @@ sub ttyrec_path {
   $dir . "/" . url_file($url)
 }
 
+sub _strip_dec {
+  my $text = shift;
+  $text =~ tr[\x61\x60\x7e\x6e\x7b\xb6\xa7\xbb\xab\xa8][#*.+_\\}{~~];
+  $text
+}
+
 sub tv_frame_strip {
   my $rdat = shift;
 
-  # Strip IBM graphics, kthx.
+  # Strip DEC graphics. Still get odd glitches at times, but way
+  # better than no DEC stripping.
+  $rdat =~ s/(\x0e)([^\x0f]+)/ $1 . _strip_dec($2) /ge;
+  $rdat =~ s/\xe2\x97\x86/*/g;
+
+  # Strip IBM graphics.
   $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
+  $rdat =~ tr/\x0e\x0f//d;
 
   # Strip unicode. Rather pricey :(
   $rdat =~ s/\xe2\x96\x92/#/g;
