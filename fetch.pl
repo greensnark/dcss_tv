@@ -156,8 +156,11 @@ sub fetch_game {
     # If the game already has an id, it's already been registered
     record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
 
-    CSplat::Ttyrec::notify_fetch_listeners("Scanning ttyrec for " .
-                                           "start frame...");
+    my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
+    CSplat::Ttyrec::notify_fetch_listeners(
+        "Scanning ttyrec for " .
+        "start frame (<$seekbefore, >$seekafter)...");
+
     eval {
       tty_frame_offset($g, 1);
     };
