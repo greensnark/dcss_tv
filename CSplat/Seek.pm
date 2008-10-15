@@ -107,6 +107,10 @@ sub tty_frame_offset {
 sub tty_calc_frame_offset {
   my ($g, $deep) = @_;
 
+  my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
+  print "Seeking (<$seekbefore, >$seekafter) for start frame for ",
+    desc_game($g), "\n";
+
   my $milestone = $g->{milestone};
   my $sz = $g->{sz};
 
@@ -137,8 +141,6 @@ sub tty_calc_frame_offset {
   if ($g->{place} =~ /^Zot/) {
     $defsz *= 2;
   }
-
-  my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
 
   # If the game itself requests a specific seek, oblige.
   $defsz *= $seekbefore;
