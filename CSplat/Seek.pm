@@ -22,7 +22,9 @@ my $TERM_Y = 24;
 my $TERM = Term::VT102->new(cols => $TERM_X, rows => $TERM_Y);
 
 our $MS_SEEK_BEFORE = $TTYRDEFSZ;
-our $MS_SEEK_AFTER  = $TTYRDEFSZ / 2;
+
+# Default seek after is 0.5 x this.
+our $MS_SEEK_AFTER  = $TTYRDEFSZ;
 
 our $BUILDUP_SIZE = $TTYRDEFSZ * 3;
 
@@ -162,13 +164,13 @@ sub tty_calc_frame_offset {
     my ($ttr, $offset, $stop_offset, $frame) =
       tty_calc_offset_in($g, $deep, $ttyrec, $sz, $skipsize, $ignore_hp);
 
-    # Seek won't presume to set an end offset, so do so here.
+    # Seek won't presume to set a stop offset, so do so here.
     if ($milestone && !defined($stop_offset) && defined($end_offset)
         && $seekafter != -100)
     {
       print "Seek after: $seekafter\n";
       my $endpad = $MS_SEEK_AFTER;
-      $endpad *= $seekafter if $seekafter;
+      $endpad *= $seekafter;
       $stop_offset = $end_offset + $endpad;
     }
     return ($ttr, $offset, $stop_offset, $frame);

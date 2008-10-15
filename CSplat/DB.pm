@@ -132,21 +132,29 @@ sub cap_game_seek {
 }
 
 sub _safenum {
-  my $s = shift;
+  my ($s, $defval) = @_;
+
+  $defval ||= 1;
 
   $s = '' unless defined $s;
   return -100 if $s eq '$';
   return 0 if $s eq '0';
 
-  no warnings 'numeric';
-  int($s || 1) || 1;
+  s/^\s+//, s/\s+$// for $s;
+
+  if ($s =~ /^[+-]\d+(?:\.\d+)?$/) {
+    $s
+  }
+  else {
+    $defval
+  }
 }
 
 sub game_seek_multipliers {
   my $g = shift;
 
   my $preseek = _safenum($g->{seekbefore});
-  my $postseek = _safenum($g->{seekafter});
+  my $postseek = _safenum($g->{seekafter}, 0.5);
   $postseek = 1 unless $g->{milestone};
 
   $preseek = cap_game_seek($preseek, -20, 20);
@@ -186,7 +194,7 @@ sub tty_save_frame_offset {
   my ($g, $ttr, $offset, $stop_offset, $frame) = @_;
   my ($pre, $post) = game_seek_multipliers($g);
 
-  if ($pre == 1 && $post == 1) {
+  if ($pre == 1 && $post == 0.5) {
     tty_delete_frame_offset($g);
     exec_query("INSERT INTO ttyrec_offset
                 (id, ttyrec, offset, stop_offset, frame, seekbefore, seekafter)

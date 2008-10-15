@@ -48,8 +48,8 @@ CREATE TABLE ttyrec_offset (
   offset INTEGER,
   stop_offset INTEGER,  -- Stop playback here.
 
-  seekbefore INTEGER NOT NULL,
-  seekafter INTEGER NOT NULL,
+  seekbefore REAL NOT NULL,
+  seekafter REAL NOT NULL,
 
   frame BLOB,
   FOREIGN KEY (id) REFERENCES games (id)
