@@ -157,6 +157,7 @@ sub fetch_game {
     record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
 
     my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
+    $seekafter = '$' if $seekafter == -100;
     CSplat::Ttyrec::notify_fetch_listeners(
         "Scanning ttyrec for " .
         "start frame (<$seekbefore, >$seekafter)...");
