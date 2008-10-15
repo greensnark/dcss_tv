@@ -155,7 +155,7 @@ sub game_seek_multipliers {
 
   my $preseek = _safenum($g->{seekbefore});
   my $postseek = _safenum($g->{seekafter}, 0.5);
-  $postseek = 1 unless $g->{milestone};
+  $postseek = 0.5 unless $g->{milestone};
 
   $preseek = cap_game_seek($preseek, -20, 20);
   $postseek = cap_game_seek($postseek, -20, 20);
