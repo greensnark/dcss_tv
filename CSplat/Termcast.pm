@@ -164,6 +164,8 @@ sub play_game {
       tty_frame_offset($g)
     };
 
+  warn $@ if $@;
+
   if ($@) {
     $self->clear();
     $self->write("Ttyrec appears corrupted.");

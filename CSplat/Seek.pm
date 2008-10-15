@@ -109,7 +109,7 @@ sub tty_calc_frame_offset {
 
   my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
   print "Seeking (<$seekbefore, >$seekafter) for start frame for ",
-    desc_game($g), "\n";
+    CSplat::Xlog::desc_game($g), "\n";
 
   my $milestone = $g->{milestone};
   my $sz = $g->{sz};
