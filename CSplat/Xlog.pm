@@ -95,7 +95,7 @@ sub desc_game_brief {
   my $xl = "$$g{xl}";
   $xl = " $xl" if length($xl) == 1;
   # Name, Title, XL, God, place, tmsg.
-  my @pieces = (pad(14, $$g{name}),
+  my @pieces = (pad(8, $$g{name}),
                 "L$xl $$g{char}",
                 pad_god(10, $$g{god}),
                 pad(7, $$g{place}),
