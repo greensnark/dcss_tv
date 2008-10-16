@@ -95,9 +95,9 @@ sub desc_game_brief {
   my $xl = "$$g{xl}";
   $xl = " $xl" if length($xl) == 1;
   # Name, Title, XL, God, place, tmsg.
-  my @pieces = (pad(8, $$g{name}),
+  my @pieces = (pad(10, $$g{name}),
                 "L$xl $$g{char}",
-                pad_god(10, $$g{god}),
+                pad_god(8, $$g{god}),
                 pad(7, $$g{place}),
                 $$g{tmsg} || $$g{milestone});
   @pieces = grep($_, @pieces);
