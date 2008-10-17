@@ -206,7 +206,8 @@ sub frame_full_hp {
 sub tty_find_offset_deep {
   my ($g, $ttyrec, $tsz, $skip, $ignore_hp) = @_;
 
-  print "Deep scanning for start frame (sz: $tsz, skip: $skip, hp_ignore: $ignore_hp) for\n" . desc_game_brief($g) . "\n";
+  my $hp = $ignore_hp ? $ignore_hp : '';
+  print "Deep scanning for start frame (sz: $tsz, skip: $skip, hp_ignore: $hp) for\n" . desc_game_brief($g) . "\n";
   local $| = 1;
 
   tv_cache_reset();
