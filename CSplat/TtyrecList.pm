@@ -37,6 +37,8 @@ sub fetch_listing {
 
 sub direct_fetch {
   my ($nick, $hostname, $url) = @_;
+
+  print "Attempting direct fetch from $hostname...\n";
   my $sock = IO::Socket::INET->new(PeerAddr => $hostname,
                                    PeerPort => $DIRECTLIST_PORT,
                                    Type => SOCK_STREAM,
@@ -48,6 +50,8 @@ sub direct_fetch {
   undef $sock;
 
   my @list = split ' ', $list;
+
+  print "Found ", @list / 2, " ttyrecs for $nick on $hostname\n";
   my @ttyrecs;
   for (my $i = 0; $i < @list; $i += 2) {
     push @ttyrecs, { u => $list[$i], sz => $list[$i + 1] };
@@ -79,6 +83,7 @@ sub human_readable_size {
 
 sub http_fetch {
   my ($nick, $server_url) = @_;
+  print "HTTP GET $server_url\n";
   my $listing = get($server_url) or return;
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
   my @urls;
