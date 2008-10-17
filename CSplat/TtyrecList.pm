@@ -35,6 +35,11 @@ sub fetch_listing {
   $res
 }
 
+sub sort_ttyrecs {
+  my $ref = shift;
+  sort { $a->{u} cmp $b->{u} } @$ref
+}
+
 sub direct_fetch {
   my ($nick, $hostname, $url) = @_;
 
@@ -58,6 +63,7 @@ sub direct_fetch {
   }
   print "Cleaning up urls with base $url\n";
   clean_ttyrec_url($url, $_) for @ttyrecs;
+  @ttyrecs = sort_ttyrecs(\@ttyrecs);
   print "Done fetching direct listing for $nick\n";
   \@ttyrecs
 }
@@ -96,6 +102,7 @@ sub http_fetch {
   }
   my @ttyrecs = map(clean_ttyrec_url($server_url, $_),
                     grep($_->{u} =~ /\.ttyrec/, @urls));
+  @ttyrecs = sort_ttyrecs(\@ttyrecs);
   \@ttyrecs
 }
 
