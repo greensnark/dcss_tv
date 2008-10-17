@@ -56,7 +56,7 @@ sub direct_fetch {
   for (my $i = 0; $i < @list; $i += 2) {
     push @ttyrecs, { u => $list[$i], sz => $list[$i + 1] };
   }
-  clean_ttyrec_url($_) for @ttyrecs;
+  clean_ttyrec_url($url, $_) for @ttyrecs;
   \@ttyrecs
 }
 
