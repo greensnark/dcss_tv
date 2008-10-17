@@ -19,6 +19,7 @@ use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
                     xlog_line xlog_merge/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
+use CSplat::TtyrecList;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
@@ -373,27 +374,6 @@ sub fetch_ttyrecs {
   download_ttyrecs($g, $no_death_check)
 }
 
-sub clean_ttyrec_url {
-  my ($baseurl, $url) = @_;
-  $url->{u} =~ s{^./}{};
-  $baseurl = "$baseurl/" unless $baseurl =~ m{/$};
-  $url->{u} = $baseurl . $url->{u};
-  $url
-}
-
-sub human_readable_size {
-  my $size = shift;
-  my ($suffix) = $size =~ /([KMG])$/i;
-  $size =~ s/[KMG]$//i;
-  if ($suffix) {
-    $suffix = lc($suffix);
-    $size *= 1024 if $suffix eq 'k';
-    $size *= 1024 * 1024 if $suffix eq 'm';
-    $size *= 1024 * 1024 * 1024 if $suffix eq 'g';
-  }
-  $size
-}
-
 sub fetch_ttyrec_urls_from_server {
   my ($name, $userpath, $time_wanted) = @_;
 
@@ -403,19 +383,11 @@ sub fetch_ttyrec_urls_from_server {
 
   notify_fetch_listeners("Fetching ttyrec listing from " . $userpath . "...");
 
-  my $listing = get($userpath) or return ();
-  my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
-  my @urls;
-  for (my $i = 0; $i < @urlsizes; $i += 2) {
-    my $url = $urlsizes[$i];
-    my $size = human_readable_size($urlsizes[$i + 1]);
-    push @urls, { u => $url, sz => $size };
-  }
-  my @ttyrecs = map(clean_ttyrec_url($userpath, $_),
-                    grep($_->{u} =~ /\.ttyrec/, @urls));
+  my $rttyrecs = CSplat::TtyrecList::fetch_listing($name, $userpath);
+  $rttyrecs = [] unless defined $rttyrecs;
 
-  $CACHED_TTYREC_URLS{$userpath} = [ $now, \@ttyrecs ];
-  @ttyrecs
+  $CACHED_TTYREC_URLS{$userpath} = [ $now, $rttyrecs ];
+  @$rttyrecs
 }
 
 sub find_ttyrecs {
