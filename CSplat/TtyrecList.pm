@@ -56,7 +56,9 @@ sub direct_fetch {
   for (my $i = 0; $i < @list; $i += 2) {
     push @ttyrecs, { u => $list[$i], sz => $list[$i + 1] };
   }
+  print "Cleaning up urls with base $url\n";
   clean_ttyrec_url($url, $_) for @ttyrecs;
+  print "Done fetching direct listing for $nick\n";
   \@ttyrecs
 }
 
