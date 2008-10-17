@@ -25,7 +25,7 @@ sub fetch_listing {
 
   if (!$HTTP_FETCH{$server}) {
     my $rttyrec = direct_fetch($nick, $server, $server_url);
-    return @$rttyrec if $rttyrec;
+    return $rttyrec if $rttyrec;
 
     # We failed to do a direct fetch, only attempt http fetches in future.
     $HTTP_FETCH{$server} = 1;
