@@ -228,7 +228,7 @@ sub request_tv {
       if (@queued_playback) {
         my @copy = map(xlog_line($_), @queued_playback);
         tv_show_playlist(\@copy, $last_game);
-        sleep 4 if $slept < 2;
+        sleep 4 if $slept == 0;
         last;
       }
 
