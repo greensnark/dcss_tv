@@ -32,7 +32,7 @@ our $TTYRMINSZ = 95 * 1024;
 
 # Largest cumulative length of ttyrec. The longer it gets, the harder we
 # have to work to seek to the fun parts.
-our $TTYRMAXSZ = 200 * 1024 * 1024;
+our $TTYRMAXSZ = 500 * 1024 * 1024;
 
 # Default ttyrec length.
 our $TTYRDEFSZ = 130 * 1024;
