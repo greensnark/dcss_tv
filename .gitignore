@@ -1,7 +1,11 @@
 data
 tv.pwd
+TAGS
+\#*
 *.log
 *.diff
 *.txt
 *.out
 *.pwd
+*.req
+.fetch.lock

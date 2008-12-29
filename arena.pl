@@ -1,0 +1,116 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use IO::Handle;
+use POE qw/Component::IRC Component::IRC::Plugin::NickReclaim/;
+
+# The plot:
+# 1) wait for requests on IRC
+# 2) on request, fork and play request, or queue request.
+# 3) cancels blow the whole playlist.
+
+my $CRAWL_HOME = $ENV{CRAWL_HOME} or die "CRAWL_HOME must be set!\n";
+my $ARENA_REQ_FILE = 'arena.req';
+
+my $ARENA_IRC_PASSFILE = 'arenairc.pwd';
+
+my $IRCSERVER = 'irc.freenode.net';
+my $IRCCHAN = '##crawl-atest';
+my $IRCNICK = 'varmin';
+my $IRCNAME = 'Varmin the sexy vermin';
+my $IRCPORT = 7000;
+my $IRCPASS = 'a7c3$eqn0xes';
+
+our $IRC;
+
+open my $REQH, '>', $ARENA_REQ_FILE or die "Could not open $ARENA_REQ_FILE: $!";
+# Start the slave that plays requests.
+system "./arena-slave.pl --req $ARENA_REQ_FILE";
+do_irc();
+
+sub do_irc {
+  $IRC = POE::Component::IRC->spawn(
+              nick => $IRCNICK,
+              server => $IRCSERVER,
+              port => $IRCPORT,
+              ircname => $IRCNAME )
+    or die "Unable to connect to $IRCSERVER: $!";
+  POE::Session->create(
+      package_states => [
+                         main => [ qw/_start irc_001 irc_public irc_msg
+                                     irc_255/ ]
+                         ],
+      heap => { irc => $IRC });
+  $poe_kernel->run();
+}
+
+sub _start {
+  my ($kernel,$heap) = @_[KERNEL,HEAP];
+
+  print "START: connecting to $IRCSERVER\n";
+  # We get the session ID of the component from the object
+  # and register and connect to the specified server.
+  my $irc_session = $heap->{irc}->session_id();
+  $kernel->post( $irc_session => register => 'all' );
+  $IRC->plugin_add( NickReclaim =>
+   	POE::Component::IRC::Plugin::NickReclaim->new( poll => 30 ));
+  $kernel->post( $irc_session => connect => { } );
+  undef;
+}
+
+sub irc_001 {
+  my ($kernel,$sender) = @_[KERNEL,SENDER];
+
+  # Get the component's object at any time by accessing the heap of
+  # the SENDER
+  my $poco_object = $sender->get_heap();
+  print "Connected to ", $poco_object->server_name(), "\n";
+
+  # In any irc_* events SENDER will be the PoCo-IRC session
+  $kernel->post( $sender => join => $IRCCHAN );
+  undef;
+}
+
+sub chomped_line {
+  my $fname = shift;
+  if (-r $fname) {
+    open my $inf, '<', $fname or return undef;
+    chomp(my $contents = <$inf>);
+    return $contents;
+  }
+  undef
+}
+
+sub irc_255 {
+  my $password = chomped_line($ARENA_IRC_PASSFILE);
+  if ($password) {
+    $IRC->yield(privmsg => nickserv => "identify $password");
+  }
+}
+
+sub process_msg {
+  my ($private, $kernel, $sender, $who, $where, $verbatim) = @_;
+  my $nick = (split /!/, $who)[0];
+
+  print "$nick: $verbatim\n";
+  if ($verbatim =~ /^!arena (.*)/i) {
+    print "Arena request: $1 by $nick\n";
+    run_arena($nick, $1);
+  }
+}
+
+sub irc_public {
+  process_msg(0, @_[KERNEL, SENDER, ARG0, ARG1, ARG2]);
+}
+
+sub irc_msg {
+  process_msg(1, @_[KERNEL, SENDER, ARG0, ARG1, ARG2]);
+}
+
+sub run_arena {
+  my ($nick, $what) = @_;
+  print $REQH "$nick: $what\n";
+  $REQH->flush();
+}
