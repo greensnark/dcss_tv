@@ -73,7 +73,6 @@ sub run_arena {
     push @queued_fights, "$who: $what";
   }
   else {
-    $what =~ s/\bcancel\b//;
     push @queued_cancels, $what;
   }
 }
@@ -163,6 +162,7 @@ sub handle_cancels {
       @queued_fights = ();
       return 1;
     }
+    $cancel =~ s/\bcancel\b//g;
     my $stripped = lc(strip_space($cancel));
     @queued_fights = grep(lc(strip_space($_)) ne $stripped, @queued_fights);
     $cancel_current = 1 if lc(strip_space($current_fight)) eq $stripped;

@@ -20,9 +20,8 @@ my $ARENA_IRC_PASSFILE = 'arenairc.pwd';
 my $IRCSERVER = 'irc.freenode.net';
 my $IRCCHAN = '##crawl';
 my $IRCNICK = 'varmin';
-my $IRCNAME = 'Varmin the sexy vermin';
+my $IRCNAME = 'Varmin the sexy verminbot';
 my $IRCPORT = 7000;
-my $IRCPASS = 'a7c3$eqn0xes';
 
 our $IRC;
 
