@@ -126,8 +126,8 @@ sub process_msg {
   if ($verbatim =~ /^!fight (.*)/i) {
     print "Fight request: $1 by $nick\n";
     run_arena($nick, $1);
-    $kernel->post($sender => privmsg => $response_to =>
-                  clean_response("Fight: $1"));
+    #$kernel->post($sender => privmsg => $response_to =>
+    #              clean_response("Fight: $1"));
   }
 }
 
