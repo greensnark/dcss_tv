@@ -121,8 +121,6 @@ sub process_msg {
   my ($private, $kernel, $sender, $who, $where, $verbatim) = @_;
   my $nick = (split /!/, $who)[0];
 
-  print "$nick: $verbatim\n";
-
   my $channel = $where->[0];
   my $response_to = $private ? $nick : $channel;
   if ($verbatim =~ /^!fight (.*)/i) {
