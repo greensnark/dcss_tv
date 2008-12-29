@@ -18,6 +18,10 @@ use threads::shared;
 
 my @queued_fights : shared;
 my @queued_cancels : shared;
+
+my @bad_requests;
+my @fight_results;
+
 my $current_fight;
 
 local $SIG{CHLD} = sub { };
@@ -27,25 +31,16 @@ GetOptions(\%opt, 'local', 'req=s');
 
 my $CRAWL_HOME = $ENV{CRAWL_HOME} or die "CRAWL_HOME must be set!\n";
 my $ARENA_REQ_FILE = $opt{req} or die "request filename not specified";
-open my $AR, '<', $ARENA_REQ_FILE or die "Cannot open $ARENA_REQ_FILE: $!";
 
-daemonize() unless $opt{local};
+my $ARENA_RESULT = 'arena.result';
+
+open my $AR, '<', $ARENA_REQ_FILE or die "Cannot open $ARENA_REQ_FILE: $!";
 
 my $TV = CSplat::Termcast->new(name => 'FightClubCrawl',
                                passfile => 'fightclub.pwd',
                                local => $opt{local});
 
 wait_for_requests();
-
-sub daemonize {
-  umask 0;
-  defined(my $pid = fork()) or die "Unable to fork: $!";
-
-  # Parent dies now.
-  exit if $pid;
-
-  setsid or die "Unable to start a new session: $!"
-}
 
 sub wait_for_requests {
   my $termc = threads->new(\&arena_tv);
@@ -83,10 +78,52 @@ sub run_arena {
   }
 }
 
+sub show_errors {
+  return unless @bad_requests;
+  $TV->write("\e[1;31mErrors\e[0m\r\n");
+  for my $err (@bad_requests) {
+    $TV->write("$err\r\n");
+  }
+  $TV->write("\r\n");
+}
+
+sub show_queue {
+  my @fights = @queued_fights;
+  return unless @fights;
+
+  @fights = @fights[0 .. 4] if @fights > 5;
+
+  $TV->write("\e[1;37mComing up\e[0m\r\n");
+  for my $fight (@fights) {
+    $TV->write("$fight\r\n");
+  }
+  $TV->write("\r\n");
+}
+
+sub show_results {
+  my $max = 10 - @queued_fights;
+  $max = 5 if $max < 5;
+
+  my @results = reverse @fight_results;
+  return unless @results;
+
+  @results = @results[0 .. ($max - 1)] if @results > $max;
+
+  $TV->write("\e[1;32mPrevious Fights\e[0m\r\n");
+  for my $res (@results) {
+    $TV->write(sprintf("%-14s %s\r\n", $res->[1], $res->[0]));
+  }
+  $TV->write("\r\n");
+}
+
 sub announce_arena {
   $TV->clear();
-  $TV->write("\e[1H\e[1;34mFight Club\e[0m\e[2H");
-  $TV->write("Use !fight on ##crawl to make a request\e[3H");
+  $TV->write("\e[1H\e[1;34mFight Club\e[0m\r\n");
+  $TV->write("Use !fight on ##crawl to make a request\r\n\r\n");
+
+  show_errors();
+  show_queue();
+  show_results();
 }
 
 sub arena_tv {
@@ -100,6 +137,8 @@ sub arena_tv {
     next unless $fight;
 
     play_fight($fight);
+
+    sleep 4;
 
     $TV->reset();
     announce_arena();
@@ -130,6 +169,55 @@ sub handle_cancels {
   $cancel_current
 }
 
+sub strip_junk {
+  my $text = shift;
+  for ($text) {
+    # Strip tags.
+    s/\b[a-z]+:\S+//g;
+
+    s/\bno_summons\b//g;
+
+    s/\s+/ /g;
+  }
+  $text
+}
+
+sub get_qualifiers {
+  my $term = shift;
+
+  my @quals;
+  if ($term =~ /\b(no_summons)\b/) {
+    push @quals, $1;
+  }
+  @quals
+}
+
+sub record_arena_result {
+  return unless -f $ARENA_RESULT;
+
+  open my $inf, '<', $ARENA_RESULT or return;
+  my $line = <$inf>;
+  return unless $line =~ /\n$/;
+
+  chomp $line;
+
+  if ($line =~ /^(\d+)-(\d+)$/) {
+    my ($a, $b) = ($1, $2);
+
+    my (@teams) = map(strip_space($_),
+                      split(/ v /, strip_junk($current_fight)));
+
+    my @qualifiers = get_qualifiers($current_fight);
+    return unless @teams == 2;
+
+    my $name = join(" v ", $b > $a ? reverse(@teams) : @teams);
+    my $result = $b > $a ? "$b - $a" : "$a - $b";
+
+    $name = "$name (" . join(", ", @qualifiers) . ")" if @qualifiers;
+    push @fight_results, [ $name, $result ];
+  }
+}
+
 sub play_fight {
   my $fight = shift;
 
@@ -139,10 +227,13 @@ sub play_fight {
 
   my $pty = IO::Pty::Easy->new;
 
-  my $dir = getcwd();
+  my $home_dir = getcwd();
   chdir "$CRAWL_HOME/source";
 
   $what =~ tr/'//d;
+
+  unlink $ARENA_RESULT;
+
   $pty->spawn("./crawl -arena '$what'");
 
   while ($pty->is_active) {
@@ -158,6 +249,11 @@ sub play_fight {
     $TV->write($read);
   }
   $pty->close();
+
+  record_arena_result();
+
+  # XXX: Don't really need this.
+  chdir $home_dir;
 
   undef $current_fight;
 }

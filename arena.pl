@@ -5,6 +5,7 @@ use warnings;
 
 use IO::Handle;
 use POE qw/Component::IRC Component::IRC::Plugin::NickReclaim/;
+use Getopt::Long;
 
 # The plot:
 # 1) wait for requests on IRC
@@ -25,10 +26,32 @@ my $IRCPASS = 'a7c3$eqn0xes';
 
 our $IRC;
 
+local $SIG{CHLD} = sub { };
+
+my %opt;
+GetOptions(\%opt, 'local', 'req=s');
+
 open my $REQH, '>', $ARENA_REQ_FILE or die "Could not open $ARENA_REQ_FILE: $!";
+
 # Start the slave that plays requests.
-system "./arena-slave.pl --req $ARENA_REQ_FILE";
+
+run_slave();
+
 do_irc();
+
+sub run_slave {
+  my $pid = fork;
+  die "Unable to fork!" unless defined $pid;
+
+  # Parent does IRC, child does the pty.
+  return if $pid;
+
+
+  my @args = ('./arena-slave.pl', '--req', $ARENA_REQ_FILE);
+  push @args, '--local' if $opt{local};
+  exec(@args);
+  exit 0;
+}
 
 sub do_irc {
   $IRC = POE::Component::IRC->spawn(
