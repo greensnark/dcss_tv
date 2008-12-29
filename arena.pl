@@ -113,14 +113,24 @@ sub irc_255 {
   }
 }
 
+sub clean_response {
+  my $text = shift;
+  length($text) > 400? substr($text, 0, 400) : $text
+}
+
 sub process_msg {
   my ($private, $kernel, $sender, $who, $where, $verbatim) = @_;
   my $nick = (split /!/, $who)[0];
 
   print "$nick: $verbatim\n";
+
+  my $channel = $where->[0];
+  my $response_to = $private ? $nick : $channel;
   if ($verbatim =~ /^!fight (.*)/i) {
     print "Fight request: $1 by $nick\n";
     run_arena($nick, $1);
+    $kernel->post($sender => privmsg => $response_to =>
+                  clean_response("Fight: $1"));
   }
 }
 
