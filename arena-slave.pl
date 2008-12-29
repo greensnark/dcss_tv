@@ -36,7 +36,7 @@ my $ARENA_RESULT = 'arena.result';
 
 open my $AR, '<', $ARENA_REQ_FILE or die "Cannot open $ARENA_REQ_FILE: $!";
 
-my $TV = CSplat::Termcast->new(name => 'FightClubCrawl',
+my $TV = CSplat::Termcast->new(name => 'FightClub',
                                passfile => 'fightclub.pwd',
                                local => $opt{local});
 
