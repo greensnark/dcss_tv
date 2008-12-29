@@ -118,8 +118,8 @@ sub process_msg {
   my $nick = (split /!/, $who)[0];
 
   print "$nick: $verbatim\n";
-  if ($verbatim =~ /^!arena (.*)/i) {
-    print "Arena request: $1 by $nick\n";
+  if ($verbatim =~ /^!fight (.*)/i) {
+    print "Fight request: $1 by $nick\n";
     run_arena($nick, $1);
   }
 }

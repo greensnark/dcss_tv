@@ -85,6 +85,7 @@ sub show_errors {
     $TV->write("$err\r\n");
   }
   $TV->write("\r\n");
+  @bad_requests = ();
 }
 
 sub show_queue {
@@ -138,7 +139,7 @@ sub arena_tv {
 
     play_fight($fight);
 
-    sleep 4;
+    sleep 4 unless @bad_requests;
 
     $TV->reset();
     announce_arena();
@@ -200,6 +201,10 @@ sub record_arena_result {
   return unless $line =~ /\n$/;
 
   chomp $line;
+
+  if ($line =~ /^err: (.*)$/) {
+    push @bad_requests, $1;
+  }
 
   if ($line =~ /^(\d+)-(\d+)$/) {
     my ($a, $b) = ($1, $2);
