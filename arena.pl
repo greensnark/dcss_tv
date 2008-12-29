@@ -18,7 +18,7 @@ my $ARENA_REQ_FILE = 'arena.req';
 my $ARENA_IRC_PASSFILE = 'arenairc.pwd';
 
 my $IRCSERVER = 'irc.freenode.net';
-my $IRCCHAN = '##crawl-atest';
+my $IRCCHAN = '##crawl';
 my $IRCNICK = 'varmin';
 my $IRCNAME = 'Varmin the sexy vermin';
 my $IRCPORT = 7000;
