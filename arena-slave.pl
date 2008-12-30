@@ -235,11 +235,9 @@ sub play_fight {
   my $home_dir = getcwd();
   chdir "$CRAWL_HOME/source";
 
-  $what =~ tr/'//d;
-
   unlink $ARENA_RESULT;
 
-  $pty->spawn("./crawl -arena '$what'");
+  $pty->spawn("./crawl -arena \Q$what\E");
 
   while ($pty->is_active) {
     if (handle_cancels()) {
