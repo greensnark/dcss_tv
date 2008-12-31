@@ -173,9 +173,6 @@ sub handle_cancels {
 sub strip_junk {
   my $text = shift;
   for ($text) {
-    # Strip tags.
-    s/\b[a-z]+:\S+//g;
-
     s/\bno_summons\b//g;
 
     s/\s+/ /g;
