@@ -238,7 +238,7 @@ sub play_fight {
 
   while ($pty->is_active) {
     if (handle_cancels()) {
-      $pty->kill('TERM', undef);
+      $pty->kill('KILL', undef);
       last;
     }
 
