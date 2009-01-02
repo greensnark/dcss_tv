@@ -194,6 +194,7 @@ sub record_arena_result {
   return unless -f $ARENA_RESULT;
 
   open my $inf, '<', $ARENA_RESULT or return;
+  my $fight_spec = <$inf>;
   my $line = <$inf>;
   return unless $line =~ /\n$/;
 
