@@ -136,7 +136,7 @@ sub irc_public {
 }
 
 sub irc_msg {
-  #process_msg(1, @_[KERNEL, SENDER, ARG0, ARG1, ARG2]);
+  process_msg(1, @_[KERNEL, SENDER, ARG0, ARG1, ARG2]);
 }
 
 sub run_arena {
