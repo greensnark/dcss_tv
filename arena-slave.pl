@@ -198,14 +198,16 @@ sub record_arena_result {
 
   open my $inf, '<', $ARENA_RESULT or return;
   my $fight_spec = <$inf>;
-  my $line = <$inf>;
-  return unless $line =~ /\n$/;
-
-  chomp $line;
 
   if ($fight_spec =~ /^err: (.*)$/) {
     push @bad_requests, $1;
+    return;
   }
+
+  my $line = <$inf>;
+  return unless $line && $line =~ /\n$/;
+
+  chomp $line;
 
   if ($line =~ /^(\d+)-(\d+)$/) {
     my ($a, $b) = ($1, $2);
