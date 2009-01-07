@@ -242,6 +242,9 @@ sub play_fight {
 
   return unless fight_ok($who, $what);
 
+  # Get rid of low-delay CPU-wastage.
+  $what =~ s/delay:(\d+)/ "delay:" . ($1 < 15 ? 15 : $1) /ge;
+
   $current_fight = $what;
 
   my $pty = IO::Pty::Easy->new;
