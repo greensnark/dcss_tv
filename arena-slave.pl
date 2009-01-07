@@ -111,7 +111,8 @@ sub show_results {
 
   $TV->write("\e[1;32mPrevious Fights\e[0m\r\n");
   for my $res (@results) {
-    $TV->write(sprintf("%-14s %s\r\n", $res->[1], $res->[0]));
+    $TV->write(sprintf("%-7s %s {%s}\r\n",
+                       $res->[1], $res->[0], $res->[2]));
   }
   $TV->write("\r\n");
 }
@@ -191,6 +192,8 @@ sub get_qualifiers {
 }
 
 sub record_arena_result {
+  my $who = shift;
+
   return unless -f $ARENA_RESULT;
 
   open my $inf, '<', $ARENA_RESULT or return;
@@ -200,7 +203,7 @@ sub record_arena_result {
 
   chomp $line;
 
-  if ($line =~ /^err: (.*)$/) {
+  if ($fight_spec =~ /^err: (.*)$/) {
     push @bad_requests, $1;
   }
 
@@ -217,14 +220,25 @@ sub record_arena_result {
     my $result = $b > $a ? "$b - $a" : "$a - $b";
 
     $name = "$name (" . join(", ", @qualifiers) . ")" if @qualifiers;
-    push @fight_results, [ $name, $result ];
+    push @fight_results, [ $name, $result, $who ];
   }
+}
+
+sub fight_ok {
+  my ($who, $what) = @_;
+  if ($what =~ /delay:0/i && $what =~ /test\s+spawner/i) {
+    push @bad_requests, "$what: no test spawners with delay:0, kthx.";
+    return undef;
+  }
+  1
 }
 
 sub play_fight {
   my $fight = shift;
 
   my ($who, $what) = $fight =~ /^(\S+): (.*)/;
+
+  return unless fight_ok($who, $what);
 
   $current_fight = $what;
 
@@ -251,7 +265,7 @@ sub play_fight {
   }
   $pty->close();
 
-  record_arena_result();
+  record_arena_result($who);
 
   # XXX: Don't really need this.
   chdir $home_dir;
