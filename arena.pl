@@ -24,6 +24,7 @@ my $IRCNAME = 'Varmin the sexy verminbot';
 my $IRCPORT = 7000;
 
 our $IRC;
+our $IRCLOG;
 
 local $SIG{CHLD} = sub { };
 
@@ -35,7 +36,6 @@ open my $REQH, '>', $ARENA_REQ_FILE or die "Could not open $ARENA_REQ_FILE: $!";
 # Start the slave that plays requests.
 
 run_slave();
-
 do_irc();
 
 sub run_slave {
@@ -45,7 +45,6 @@ sub run_slave {
   # Parent does IRC, child does the pty.
   return if $pid;
 
-
   my @args = ('./arena-slave.pl', '--req', $ARENA_REQ_FILE);
   push @args, '--local' if $opt{local};
   exec(@args);
@@ -53,6 +52,8 @@ sub run_slave {
 }
 
 sub do_irc {
+  open $IRCLOG, '>>', 'irc.log';
+
   $IRC = POE::Component::IRC->spawn(
               nick => $IRCNICK,
               server => $IRCSERVER,
@@ -117,11 +118,24 @@ sub clean_response {
   length($text) > 400? substr($text, 0, 400) : $text
 }
 
+sub log_irc {
+  if ($IRCLOG) {
+    my ($private, $chan, $nick, $verbatim) = @_;
+    chomp $verbatim;
+    my $pm = $private ? " (pm)" : "";
+    print $IRCLOG "[" . scalar(gmtime()) . "] $nick$pm: $verbatim\n";
+    $IRCLOG->flush;
+  }
+}
+
 sub process_msg {
   my ($private, $kernel, $sender, $who, $where, $verbatim) = @_;
   my $nick = (split /!/, $who)[0];
 
   my $channel = $where->[0];
+
+  log_irc($private, $channel, $nick, $verbatim);
+
   my $response_to = $private ? $nick : $channel;
   if ($verbatim =~ /^!fight (.*)/i) {
     print "Fight request: $1 by $nick\n";
