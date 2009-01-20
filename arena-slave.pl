@@ -26,6 +26,10 @@ my $current_fight;
 
 local $SIG{CHLD} = sub { };
 
+# Force canonical term size.
+$ENV{LINES} = 24;
+$ENV{COLUMNS} = 80;
+
 my %opt;
 GetOptions(\%opt, 'local', 'req=s');
 
