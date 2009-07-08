@@ -37,8 +37,9 @@ my $FETCH_ONLY = 0;
 
 my @LOG_URLS = ('http://crawl.akrasiac.org/allgames.txt',
                 'http://crawl.akrasiac.org/logfile04',
-                'http://crawl.develz.org/allgames-old.txt',
-                'http://crawl.develz.org/allgames-rel.txt',
+                'http://crawl.akrasiac.org/logfile05',
+                'http://crawl.develz.org/allgames-0.4.txt',
+                'http://crawl.develz.org/allgames-0.5.txt',
                 'http://crawl.develz.org/allgames-svn.txt');
 
 my @LOG_FILES = map { m{.*/(.*)} } @LOG_URLS;
