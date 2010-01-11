@@ -21,6 +21,18 @@ our $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
 # Port that the ttyrec fetch server listens on.
 our $FETCH_PORT = 41280;
 
+our $RC = 'csplat.rc';
+
+if (-f $RC) {
+  open my $inf, '<', $RC;
+  while (<$inf>) {
+    if (/^\s*fetch_port\s*=\s*(\d+)\s*$/) {
+      $FETCH_PORT = int($1);
+    }
+  }
+}
+print "Fetch port: $FETCH_PORT\n":
+
 our %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
                              dsttz => 'EDT',
