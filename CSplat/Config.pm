@@ -31,7 +31,7 @@ if (-f $RC) {
     }
   }
 }
-print "Fetch port: $FETCH_PORT\n":
+print "Fetch port: $FETCH_PORT\n";
 
 our %SERVMAP =
   ('crawl.akrasiac.org' => { tz => 'EST',
