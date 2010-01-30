@@ -21,7 +21,7 @@ my $IRCSERVER = 'irc.freenode.net';
 my $IRCCHAN = '##crawl';
 my $IRCNICK = 'varmin';
 my $IRCNAME = 'Varmin the sexy verminbot';
-my $IRCPORT = 7000;
+my $IRCPORT = 8001;
 
 our $IRC;
 our $IRCLOG;
