@@ -103,6 +103,7 @@ sub http_fetch {
     print "Could not fetch listing from $server_url\n";
     return;
   };
+  print "Done fetching HTTP listing for $nick\n";
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
   my @urls;
   for (my $i = 0; $i < @urlsizes; $i += 2) {
@@ -115,6 +116,7 @@ sub http_fetch {
   my @ttyrecs = map(clean_ttyrec_url($server_url, $_),
                     grep($_->{u} =~ /\.ttyrec/, @urls));
   @ttyrecs = sort_ttyrecs(\@ttyrecs);
+  print "Sorted HTTP listing for $nick, ", scalar(@ttyrecs), " files found\n";
   \@ttyrecs
 }
 
