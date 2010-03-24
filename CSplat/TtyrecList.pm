@@ -59,7 +59,9 @@ sub direct_fetch {
   print "Found ", @list / 2, " ttyrecs for $nick on $hostname\n";
   my @ttyrecs;
   for (my $i = 0; $i < @list; $i += 2) {
-    push @ttyrecs, { u => $list[$i], sz => $list[$i + 1] };
+    push @ttyrecs, { u => $list[$i],
+                     timestr => $list[$i],
+                     sz => $list[$i + 1] };
   }
   print "Cleaning up urls with base $url\n";
   clean_ttyrec_url($url, $_) for @ttyrecs;
