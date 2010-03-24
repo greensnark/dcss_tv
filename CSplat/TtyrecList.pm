@@ -37,7 +37,7 @@ sub fetch_listing {
 
 sub sort_ttyrecs {
   my $ref = shift;
-  sort { $a->{u} cmp $b->{u} } @$ref
+  sort { $a->{timestr} cmp $b->{timestr} } @$ref
 }
 
 sub direct_fetch {
@@ -89,6 +89,12 @@ sub human_readable_size {
   $size
 }
 
+sub ttyrec_url_timestring {
+  my $url = shift;
+  return $1 if $url =~ /(\d{4}-\d{2}.*)/;
+  return $url;
+}
+
 sub http_fetch {
   my ($nick, $server_url) = @_;
   print "HTTP GET $server_url\n";
@@ -98,7 +104,9 @@ sub http_fetch {
   for (my $i = 0; $i < @urlsizes; $i += 2) {
     my $url = $urlsizes[$i];
     my $size = human_readable_size($urlsizes[$i + 1]);
-    push @urls, { u => $url, sz => $size };
+    push @urls, { u => $url,
+                  timestr => ttyrec_url_timestring($url),
+                  sz => $size };
   }
   my @ttyrecs = map(clean_ttyrec_url($server_url, $_),
                     grep($_->{u} =~ /\.ttyrec/, @urls));
