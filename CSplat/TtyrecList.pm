@@ -104,7 +104,7 @@ sub http_fetch {
     return;
   };
   print "Done fetching HTTP listing for $nick\n";
-  my @urlsizes = $listing =~ /a\s+href\s*=\s*["']([^"']*?ttyrec[^"']*?)["']\s*>.*?([\d.]+[kM])\b/gi;
+  my (@urlsizes) = $listing =~ /<\s*a\s+href\s*=\s*["']([^"']*?ttyrec[^"']*?)["'].*?([\d.]+[kMB])/gis;
   my @urls;
   for (my $i = 0; $i < @urlsizes; $i += 2) {
     my $url = $urlsizes[$i];
