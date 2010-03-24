@@ -99,7 +99,10 @@ sub http_fetch {
   my ($nick, $server_url) = @_;
   $server_url = "$server_url/" unless $server_url =~ m{/$};
   print "HTTP GET $server_url\n";
-  my $listing = get($server_url) or return;
+  my $listing = get($server_url) or do {
+    print "Could not fetch listing from $server_url\n";
+    return;
+  };
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
   my @urls;
   for (my $i = 0; $i < @urlsizes; $i += 2) {
