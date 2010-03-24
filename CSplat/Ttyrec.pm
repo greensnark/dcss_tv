@@ -15,7 +15,8 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     request_cache_clear/;
 
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
-                      $FETCH_PORT server_field game_server/;
+                      $FETCH_PORT server_field game_server
+                      resolve_canonical_game_version/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
                     xlog_line xlog_merge/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
@@ -71,16 +72,14 @@ sub clear_cached_urls {
 
 sub have_cached_listing_for_game {
   my $g = shift;
-  my $servpath = server_field($g, 'ttypath');
-  my $userpath = "$servpath/$g->{name}";
-  $CACHED_TTYREC_URLS{$userpath}
+  my $path = find_game_ttyrec_list_path($g);
+  $CACHED_TTYREC_URLS{$path}
 }
 
 sub clear_cached_urls_for_game {
   my $g = shift;
-  my $servpath = server_field($g, 'ttypath');
-  my $userpath = "$servpath/$g->{name}";
-  delete $CACHED_TTYREC_URLS{$userpath};
+  my $path = find_game_ttyrec_list_path($g);
+  delete $CACHED_TTYREC_URLS{$path};
 }
 
 sub ttyrecs_out_of_time_bounds {
@@ -390,14 +389,19 @@ sub fetch_ttyrec_urls_from_server {
   @$rttyrecs
 }
 
+sub find_game_ttyrec_list_path {
+  my $servpath = server_field($g, 'ttypath');
+  my $userpath = resolve_canonical_game_version("$servpath/$g->{name}", $g);
+  return $userpath;
+}
+
 sub find_ttyrecs {
   my $g = shift;
-  my $servpath = server_field($g, 'ttypath');
-  my $userpath = "$servpath/$g->{name}";
 
+  my $ttyrecurl = find_game_ttyrec_list_path($g);
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
   my $time = int(UnixDate($end, "%s"));
-  my @urls = fetch_ttyrec_urls_from_server($g->{name}, $userpath, $time);
+  my @urls = fetch_ttyrec_urls_from_server($g->{name}, $ttyrecurl, $time);
   @urls
 }
 

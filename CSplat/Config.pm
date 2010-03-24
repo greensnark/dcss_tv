@@ -6,7 +6,8 @@ package CSplat::Config;
 use base 'Exporter';
 our @EXPORT_OK = qw/$DATA_DIR $TTYREC_DIR %SERVMAP
                     $UTC_EPOCH $UTC_BEFORE $UTC_AFTER
-                    $FETCH_PORT server_field game_server/;
+                    $FETCH_PORT server_field game_server
+                    resolve_canonical_game_version/;
 
 use Carp;
 use Date::Manip;
@@ -61,4 +62,22 @@ sub server_field {
 
   my $sfield = $SERVMAP{$server} or die "Unknown server: $server\n";
   $sfield->{$field}
+}
+
+sub canonical_game_version {
+  my $g = shift;
+  my $file = $$g{file};
+
+  # Not exactly ideal, but what the hell.
+  return 'crawl-0.6' if $file =~ /-0.6/;
+  return 'trunk' if $file =~ /-trunk/;
+  return 'crawl';
+}
+
+sub resolve_canonical_game_version {
+  my ($path, $g) = @_;
+  if ($path =~ /\$game\$/) {
+    $path =~ s/\$game\$/ canonical_game_version($g) /gi;
+  }
+  return $path;
 }
