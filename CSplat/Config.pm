@@ -41,7 +41,7 @@ our %SERVMAP =
    'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
                            ttypath => 'http://crawl.develz.org/ttyrecs' },
    'rl.heh.fi' => { tz => 'UTC',
-                    ttypath => 'http://rl.heh.fi/$game$/stuff/' });
+                    ttypath => 'http://rl.heh.fi/$game$/stuff' });
 
 our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
                    cdo => 'http://crawl.develz.org/',
