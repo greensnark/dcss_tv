@@ -97,6 +97,7 @@ sub ttyrec_url_timestring {
 
 sub http_fetch {
   my ($nick, $server_url) = @_;
+  $server_url = "$server_url/" unless $server_url =~ m{/$};
   print "HTTP GET $server_url\n";
   my $listing = get($server_url) or return;
   my @urlsizes = $listing =~ /a\s+href\s*=\s*["'](.*?)["'].*?([\d.]+[kM])\b/gi;
