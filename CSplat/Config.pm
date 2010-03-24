@@ -77,7 +77,7 @@ sub canonical_game_version {
 sub resolve_canonical_game_version {
   my ($path, $g) = @_;
   if ($path =~ /\$game\$/) {
-    $path =~ s/\$game\$/ canonical_game_version($g) /gi;
+    $path =~ s/\$game\$/ canonical_game_version($g) /ge;
   }
   return $path;
 }
