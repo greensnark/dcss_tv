@@ -390,6 +390,7 @@ sub fetch_ttyrec_urls_from_server {
 }
 
 sub find_game_ttyrec_list_path {
+  my $g = shift;
   my $servpath = server_field($g, 'ttypath');
   my $userpath = resolve_canonical_game_version("$servpath/$g->{name}", $g);
   return $userpath;
