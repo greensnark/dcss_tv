@@ -245,6 +245,7 @@ sub ttyrec_play_time {
   my $pframe;
   my $frame;
   my $seek_frame_offset;
+  my $last_frame_offset;
   eval {
     while (my $fref = $t->next_frame()) {
       $frame = tell($t->filehandle()) if $seekdelta;
@@ -253,16 +254,21 @@ sub ttyrec_play_time {
       $first_ts = $ts unless defined $first_ts;
       $last_ts = $ts;
 
+      $last_frame_offset = $pframe || $frame;
       if (defined($seekdelta) && !$seek_frame_offset
           && $last_ts - $first_ts >= $seekdelta)
       {
-        $seek_frame_offset = $pframe || $frame;
+        $seek_frame_offset = $last_frame_offset;
       }
 
       $pframe = $frame;
     }
   };
   warn "$@" if $@;
+
+  if (defined($seekdelta) && !defined($seek_frame_offset)) {
+    $seek_frame_offset = $last_frame_offset;
+  }
 
   return (undef, undef, undef) unless defined $first_ts;
 
