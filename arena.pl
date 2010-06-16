@@ -17,10 +17,9 @@ my $ARENA_REQ_FILE = 'arena.req';
 my $ARENA_IRC_PASSFILE = 'arenairc.pwd';
 
 my $IRCSERVER = 'irc.freenode.net';
-my $IRCCHAN = '##crawl';
 my $IRCNICK = 'varmin';
 my $IRCNAME = 'Varmin the sexy verminbot';
-my $IRCPORT = 8001;
+my $IRCPORT = 6667;
 
 my @CHANNELS = ('##crawl', '##crawl-dev');
 
@@ -123,7 +122,7 @@ use base 'Bot::BasicBot';
 sub connected {
   my $self = shift;
 
-  my $password = chomped_line($ARENA_IRC_PASSFILE);
+  my $password = main::chomped_line($ARENA_IRC_PASSFILE);
   if ($password) {
     $self->say(channel => 'msg',
                who => 'nickserv',
