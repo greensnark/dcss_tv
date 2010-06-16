@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use IO::Handle;
-use POE qw/Component::IRC Component::IRC::Plugin::NickReclaim/;
 use Getopt::Long;
 
 # The plot:
@@ -23,8 +22,15 @@ my $IRCNICK = 'varmin';
 my $IRCNAME = 'Varmin the sexy verminbot';
 my $IRCPORT = 8001;
 
+my @CHANNELS = ('##crawl', '##crawl-dev');
+
 our $IRC;
-our $IRCLOG;
+our $LOGCRAWL;
+our $LOGCRAWLDEV;
+
+my %LOGCHANNEL = ('##crawl' => [ 'irc-crawl.log' ],
+                  '##crawl-dev' => [ 'irc-crawl-dev.log' ],
+                  'msg' => [ 'irc-msg.log' ]);
 
 local $SIG{CHLD} = sub { };
 
@@ -52,48 +58,19 @@ sub run_slave {
 }
 
 sub do_irc {
-  open $IRCLOG, '>>', 'irc.log';
+  for my $chan (keys %LOGCHANNEL) {
+    my $flog = $LOGCHANNEL{$chan};
+    open my $file, '>>', $$flog[0] or die "Can't open: $$flog[0]: $!\n";
+    push @$flog, $file;
+  }
 
-  $IRC = POE::Component::IRC->spawn(
-              nick => $IRCNICK,
-              server => $IRCSERVER,
-              port => $IRCPORT,
-              ircname => $IRCNAME )
+  $IRC = Varmin->new(nick => $IRCNICK,
+                     server => $IRCSERVER,
+                     port => $IRCPORT,
+                     ircname => $IRCNAME,
+                     channels => [ @CHANNELS ])
     or die "Unable to connect to $IRCSERVER: $!";
-  POE::Session->create(
-      package_states => [
-                         main => [ qw/_start irc_001 irc_public irc_msg
-                                     irc_255/ ]
-                         ],
-      heap => { irc => $IRC });
-  $poe_kernel->run();
-}
-
-sub _start {
-  my ($kernel,$heap) = @_[KERNEL,HEAP];
-
-  print "START: connecting to $IRCSERVER\n";
-  # We get the session ID of the component from the object
-  # and register and connect to the specified server.
-  my $irc_session = $heap->{irc}->session_id();
-  $kernel->post( $irc_session => register => 'all' );
-  $IRC->plugin_add( NickReclaim =>
-   	POE::Component::IRC::Plugin::NickReclaim->new( poll => 30 ));
-  $kernel->post( $irc_session => connect => { } );
-  undef;
-}
-
-sub irc_001 {
-  my ($kernel,$sender) = @_[KERNEL,SENDER];
-
-  # Get the component's object at any time by accessing the heap of
-  # the SENDER
-  my $poco_object = $sender->get_heap();
-  print "Connected to ", $poco_object->server_name(), "\n";
-
-  # In any irc_* events SENDER will be the PoCo-IRC session
-  $kernel->post( $sender => join => $IRCCHAN );
-  undef;
+  $IRC->run();
 }
 
 sub chomped_line {
@@ -106,55 +83,82 @@ sub chomped_line {
   undef
 }
 
-sub irc_255 {
-  my $password = chomped_line($ARENA_IRC_PASSFILE);
-  if ($password) {
-    $IRC->yield(privmsg => nickserv => "identify $password");
-  }
-}
-
 sub clean_response {
   my $text = shift;
   length($text) > 400? substr($text, 0, 400) : $text
 }
 
 sub log_irc {
-  if ($IRCLOG) {
-    my ($private, $chan, $nick, $verbatim) = @_;
-    chomp $verbatim;
-    my $pm = $private ? " (pm)" : "";
-    print $IRCLOG "[" . scalar(gmtime()) . "] $nick$pm: $verbatim\n";
-    $IRCLOG->flush;
+  my ($m, $line) = @_;
+
+  my $log = ${$LOGCHANNEL{$$m{channel}}}[1];
+  if ($log) {
+    chomp $line;
+    print $log "[" . scalar(gmtime()) . "] $line\n";
+    $log->flush;
   }
 }
 
 sub process_msg {
-  my ($private, $kernel, $sender, $who, $where, $verbatim) = @_;
-  my $nick = (split /!/, $who)[0];
+  my ($m) = @_;
+  my $nick = $$m{who};
+  my $channel = $$m{channel};
 
-  my $channel = $where->[0];
-
-  log_irc($private, $channel, $nick, $verbatim);
-
-  my $response_to = $private ? $nick : $channel;
-  if ($verbatim =~ /^!fight (.*)/i) {
+  my $body = $$m{body};
+  if ($body =~ /^!fight (.*)/i) {
     print "Fight request: $1 by $nick\n";
     run_arena($nick, $1);
-    #$kernel->post($sender => privmsg => $response_to =>
-    #              clean_response("Fight: $1"));
   }
-}
-
-sub irc_public {
-  process_msg(0, @_[KERNEL, SENDER, ARG0, ARG1, ARG2]);
-}
-
-sub irc_msg {
-  process_msg(1, @_[KERNEL, SENDER, ARG0, ARG1, ARG2]);
 }
 
 sub run_arena {
   my ($nick, $what) = @_;
   print $REQH "$nick: $what\n";
   $REQH->flush();
+}
+
+package Varmin;
+use base 'Bot::BasicBot';
+
+sub connected {
+  my $self = shift;
+
+  my $password = chomped_line($ARENA_IRC_PASSFILE);
+  if ($password) {
+    $self->say(channel => 'msg',
+               who => 'nickserv',
+               body => "identify $password");
+  }
+  return undef;
+}
+
+sub emoted {
+  my ($self, $e) = @_;
+  log_irc($e, "* $$e{who} $$e{body}");
+  return undef;
+}
+
+sub said {
+  my ($self, $m) = @_;
+  log_irc($m, "$$m{who}: $$m{body}");
+  main::process_message($m);
+  return undef;
+}
+
+sub chanjoin {
+  my ($self, $j) = @_;
+  log_irc($j, "-|- $$j{who} has joined $$j{channel}");
+  return undef;
+}
+
+sub userquit {
+  my ($self, $q) = @_;
+  log_irc($q, "-|- $$q{who} has quit [$$q{body}]");
+  return undef;
+}
+
+sub chanpart {
+  my ($self, $m) = @_;
+  log_irc($m, "-|- $$m{who} has left $$m{channel}");
+  return undef;
 }
