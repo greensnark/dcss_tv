@@ -133,31 +133,31 @@ sub connected {
 
 sub emoted {
   my ($self, $e) = @_;
-  log_irc($e, "* $$e{who} $$e{body}");
+  main::log_irc($e, "* $$e{who} $$e{body}");
   return undef;
 }
 
 sub said {
   my ($self, $m) = @_;
-  log_irc($m, "$$m{who}: $$m{body}");
-  main::process_message($m);
+  main::log_irc($m, "$$m{who}: $$m{body}");
+  main::process_msg($m);
   return undef;
 }
 
 sub chanjoin {
   my ($self, $j) = @_;
-  log_irc($j, "-|- $$j{who} has joined $$j{channel}");
+  main::log_irc($j, "-|- $$j{who} has joined $$j{channel}");
   return undef;
 }
 
 sub userquit {
   my ($self, $q) = @_;
-  log_irc($q, "-|- $$q{who} has quit [$$q{body}]");
+  main::log_irc($q, "-|- $$q{who} has quit [$$q{body}]");
   return undef;
 }
 
 sub chanpart {
   my ($self, $m) = @_;
-  log_irc($m, "-|- $$m{who} has left $$m{channel}");
+  main::log_irc($m, "-|- $$m{who} has left $$m{channel}");
   return undef;
 }
