@@ -239,7 +239,7 @@ sub ttyrec_play_time {
   my $first_ts;
 
   my $seekdelta =
-    $seektime ? int(Delta_Format(DateCalc($start, $seektime), undef, '%st'))
+    $seektime ? int(Delta_Format(DateCalc($start, $seektime), 0, '%st'))
               : undef;
 
   my $pframe;
