@@ -35,7 +35,7 @@ GetOptions(\%opt, 'local', 'local-request');
 my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
-my $REQUEST_HOST = 'crawl.akrasiac.org';
+my $REQUEST_HOST = '127.0.0.1';
 my $REQUEST_PORT = 21976;
 
 $REQUEST_HOST = 'localhost' if $opt{'local-request'};
