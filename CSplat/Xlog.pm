@@ -77,8 +77,6 @@ sub pad_god {
 
 sub desc_game_brief {
   my $g = shift;
-  my $xl = "$$g{xl}";
-  $xl = " $xl" if length($xl) == 1;
   # Name, Title, XL, God, place, tmsg.
   my @pieces = (pad(10, $$g{name}),
                 $$g{death} || $$g{mdesc});
