@@ -54,25 +54,11 @@ sub xlog_merge {
 
 sub desc_game {
   my $g = shift;
-  my $god = $g->{god} ? ", worshipper of $g->{god}" : "";
-  my $dmsg = $g->{vmsg} || $g->{tmsg} || $g->{milestone};
-  my $place = $g->{place};
-  my $ktyp = $g->{ktyp} || '';
 
-  my $prep = grep($_ eq $place, qw/Temple Blade Hell/)? "in" : "on";
-  $prep = "in" if $g->{ltyp} ne 'D';
-  $place = "the $place" if grep($_ eq $place, qw/Temple Abyss/);
-  $place = "a Labyrinth" if $place eq 'Lab';
-  $place = "a Bazaar" if $place eq 'Bzr';
-  $place = "Pandemonium" if $place eq 'Pan';
-  $place = " $prep $place";
-
-  $place = '' if $ktyp eq 'winning' || $ktyp eq 'leaving';
-
-  my $when = " on " . fix_crawl_time($g->{end} || $g->{time});
-
-  "$g->{name} the $g->{title} (L$g->{xl} $g->{char})$god, $dmsg$place$when, " .
-    "after $g->{turn} turns"
+  my $desc = $$g{death} || $$g{mdesc};
+  my $place = $$g{place};
+  $place = " ($place)" if $place;
+  "$$g{name} $desc$place"
 }
 
 sub pad {
@@ -96,10 +82,7 @@ sub desc_game_brief {
   $xl = " $xl" if length($xl) == 1;
   # Name, Title, XL, God, place, tmsg.
   my @pieces = (pad(10, $$g{name}),
-                "L$xl $$g{char}",
-                pad_god(8, $$g{god}),
-                pad(7, $$g{place}),
-                $$g{tmsg} || $$g{milestone});
+                $$g{death} || $$g{mdesc});
   @pieces = grep($_, @pieces);
   my $text = join("  ", @pieces);
   $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
