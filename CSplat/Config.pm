@@ -20,7 +20,7 @@ our $UTC_BEFORE = DateCalc($UTC_EPOCH, "-1 days");
 our $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
 
 # Port that the ttyrec fetch server listens on.
-our $FETCH_PORT = 41280;
+our $FETCH_PORT = 49280;
 
 our $RC = 'csplat.rc';
 
