@@ -12,7 +12,6 @@ our $MAX_WIDTH = 80;
 
 sub fix_crawl_time {
   my $time = shift;
-  $time =~ s/^(\d{4})(\d{2})/ sprintf "%04d%02d", $1, $2 + 1 /e;
   $time
 }
 
