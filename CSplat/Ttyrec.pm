@@ -485,16 +485,6 @@ sub tv_frame_strip {
   $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
   $rdat =~ tr/\x0e\x0f//d;
 
-  # Strip unicode. Rather pricey :(
-  $rdat =~ s/\xe2\x96\x92/#/g;
-  $rdat =~ s/\xe2\x96\x91/*/g;
-  $rdat =~ s/\xc2\xb7/./g;
-  $rdat =~ s/\xe2\x97\xa6/,/g;
-  $rdat =~ s/\xe2\x97\xbc/+/g;
-  $rdat =~ s/\xe2\x88\xa9/\\/g;
-  $rdat =~ s/\xe2\x8c\xa0/}/g;
-  $rdat =~ s/\xe2\x89\x88/{/g;
-
   $rdat
 }
 
