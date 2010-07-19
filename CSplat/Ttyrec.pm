@@ -475,16 +475,6 @@ sub _strip_dec {
 
 sub tv_frame_strip {
   my $rdat = shift;
-
-  # Strip DEC graphics. Still get odd glitches at times, but way
-  # better than no DEC stripping.
-  $rdat =~ s/(\x0e)([^\x0f]+)/ $1 . _strip_dec($2) /ge;
-  $rdat =~ s/\xe2\x97\x86/*/g;
-
-  # Strip IBM graphics.
-  $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
-  $rdat =~ tr/\x0e\x0f//d;
-
   $rdat
 }
 
