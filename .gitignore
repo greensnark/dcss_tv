@@ -1,6 +1,7 @@
 data
 tv.pwd
 TAGS
+*.sw?
 \#*
 *.log
 *.diff
