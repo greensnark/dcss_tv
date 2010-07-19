@@ -36,14 +36,14 @@ my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
 my $REQUEST_HOST = '127.0.0.1';
-my $REQUEST_PORT = 21976;
+my $REQUEST_PORT = 29976;
 
 $REQUEST_HOST = 'localhost' if $opt{'local-request'};
 
 my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
                                port => $REQUEST_PORT);
 
-my $TV = CSplat::Termcast->new(name => 'FooTV',
+my $TV = CSplat::Termcast->new(name => 'UnTV',
                                passfile => 'foo.pwd',
                                local => $opt{local});
 
