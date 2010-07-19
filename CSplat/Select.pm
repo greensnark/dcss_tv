@@ -132,46 +132,7 @@ sub game_splattiness {
 sub _interesting_game {
   my ($g, $fix_time) = @_;
 
-  # Just in case, check for wizmode games.
-  return if $g->{wiz};
-
-  my $ktyp = $g->{ktyp};
-  return if grep($ktyp eq $_, qw/quitting leaving winning/);
-
-  # No matter how high level, ignore Temple deaths.
-  return if $g->{place} eq 'Temple';
-
-  my $start = tty_time($g, 'starttime');
-  my $end = tty_time($g, 'endtime');
-
-  # dgl start bug, aieee!
-  if ($start gt $end && $fix_time) {
-    # If we have the previous game's end time, use that as our start time.
-    my $pend = $PGAME_CACHE{$g->{src}}{$g->{name}};
-    $g->{start} = $pend if $pend;
-  }
-
-  # If the game was in the hazy date range when Crawl was between
-  # UTC and local time, skip.
-  return if ($end ge $UTC_BEFORE && $end le $UTC_AFTER);
-
-  my $xl = $g->{xl};
-  my $place = $g->{place};
-  my $killer = $g->{killer} || '';
-
-  my $good =
-    $xl >= 22
-      || is_interesting_place($g, $place, $xl)
-      # High-level player ghost splats.
-      || ($xl >= 15 && $killer =~ /'s? ghost/)
-      || ($xl >= 15 && $COOL_UNIQUES{$killer});
-
-  if (is_blacklisted($g)) {
-    warn "Game is blacklisted: ", desc_game($g), "\n" if $good;
-    return;
-  }
-
-  $good
+  return undef;
 }
 
 1
