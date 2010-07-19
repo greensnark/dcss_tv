@@ -84,8 +84,8 @@ sub clear_cached_urls_for_game {
 
 sub ttyrecs_out_of_time_bounds {
   my $g = shift;
-  my $start = tty_time($g, 'start');
-  my $end = tty_time($g, 'end');
+  my $start = tty_time($g, 'starttime');
+  my $end = tty_time($g, 'endtime');
 
   for my $tty (split / /, $g->{ttyrecs}) {
     if (!ttyrec_between($tty, $start, $end)) {
@@ -339,9 +339,8 @@ sub fetch_ttyrecs {
     return xlog_merge($g, $clone);
   }
 
-  my $start = tty_time($g, 'start');
-  my $end = tty_time($g, 'end');
-  $end ||= tty_time($g, 'time');
+  my $start = tty_time($g, 'starttime');
+  my $end = tty_time($g, 'endtime') || tty_time($g, 'currenttime');
 
   my @ttyrecs;
 
@@ -398,7 +397,7 @@ sub fetch_ttyrec_urls_from_server {
 sub find_game_ttyrec_list_path {
   my $g = shift;
   my $servpath = server_field($g, 'ttypath');
-  my $userpath = resolve_canonical_game_version("$servpath/$g->{name}", $g);
+  my $userpath = resolve_canonical_game_version($servpath, $g);
   return $userpath;
 }
 
@@ -406,7 +405,8 @@ sub find_ttyrecs {
   my $g = shift;
 
   my $ttyrecurl = find_game_ttyrec_list_path($g);
-  my $end = tty_time($g, 'end') || tty_time($g, 'time');
+  my $end = (tty_time($g, 'end') || tty_time($g, 'time')
+             || tty_time($g, 'endtime') || tty_time($g, 'currenttime'));
   my $time = int(UnixDate($end, "%s"));
   my @urls = fetch_ttyrec_urls_from_server($g->{name}, $ttyrecurl, $time);
   @urls

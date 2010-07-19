@@ -141,8 +141,8 @@ sub _interesting_game {
   # No matter how high level, ignore Temple deaths.
   return if $g->{place} eq 'Temple';
 
-  my $start = tty_time($g, 'start');
-  my $end = tty_time($g, 'end');
+  my $start = tty_time($g, 'starttime');
+  my $end = tty_time($g, 'endtime');
 
   # dgl start bug, aieee!
   if ($start gt $end && $fix_time) {

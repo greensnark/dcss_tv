@@ -35,17 +35,12 @@ if (-f $RC) {
 print "Fetch port: $FETCH_PORT\n";
 
 our %SERVMAP =
-  ('crawl.akrasiac.org' => { tz => 'EST',
-                             dsttz => 'EDT',
-                             ttypath => 'http://crawl.akrasiac.org/rawdata' },
-   'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
-                           ttypath => 'http://crawl.develz.org/ttyrecs' },
-   'rl.heh.fi' => { tz => 'UTC',
-                    ttypath => 'http://rl.heh.fi/$game$/stuff' });
+  ('un.nethack.nu' =>
+   { tz => 'UTC',
+     ttypath => 'http://un.nethack.nu/users/$user$/ttyrecs/' }
+  );
 
-our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
-                   cdo => 'http://crawl.develz.org/',
-                   rhf => 'http://rl.heh.fi/');
+our %SERVABBREV = (unn => 'http://un.nethack.nu/');
 
 sub game_server {
   my $g = shift;
@@ -78,6 +73,9 @@ sub resolve_canonical_game_version {
   my ($path, $g) = @_;
   if ($path =~ /\$game\$/) {
     $path =~ s/\$game\$/ canonical_game_version($g) /ge;
+  }
+  if ($path =~ /\$user\$/) {
+    $path =~ s/\$user\$/ $$g{name} /ge;
   }
   return $path;
 }
