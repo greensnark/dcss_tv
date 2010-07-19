@@ -214,7 +214,7 @@ sub request_tv {
       $TV->write("\e[0m\r\n\r\n");
     }
 
-    $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
+    $TV->write("Waiting for requests (use !tv on #unnethack to request a game).");
     $TV->write("\r\n\r\n");
 
     my $slept = 0;
