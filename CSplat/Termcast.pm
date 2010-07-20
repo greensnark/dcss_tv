@@ -29,7 +29,9 @@ sub new {
   $self->{host} ||= '213.184.131.118';
   $self->{port} ||= 31337;
 
-  $self->{pass} = read_password($self->{passfile}) if $self->{passfile};
+  if ($self->{passfile} && !$self->{local}) {
+    $self->{pass} = read_password($self->{passfile});
+  }
 
   carp("Need channel name (name) and password (pass)\n")
     unless $self->{name} && $self->{pass};
