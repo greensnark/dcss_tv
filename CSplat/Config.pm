@@ -37,10 +37,10 @@ print "Fetch port: $FETCH_PORT\n";
 our %SERVMAP =
   ('un.nethack.nu' =>
    { tz => 'UTC',
-     ttypath => 'http://un.nethack.nu/users/$user$/ttyrecs/' },
+     ttypath => 'http://un.nethack.nu/users/$user$/ttyrecs' },
    'sporkhack.org' =>
    { tz => 'UTC',
-     ttypath => 'http://sporkhack.com/ttyrec' },
+     ttypath => 'http://sporkhack.com/ttyrec/$user$' },
    'alt.org' =>
    { tz => 'UTC',
      ttypath => 'http://alt.org/nethack/userdata/$user$/ttyrec' }
