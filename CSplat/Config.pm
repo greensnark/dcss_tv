@@ -37,10 +37,18 @@ print "Fetch port: $FETCH_PORT\n";
 our %SERVMAP =
   ('un.nethack.nu' =>
    { tz => 'UTC',
-     ttypath => 'http://un.nethack.nu/users/$user$/ttyrecs/' }
+     ttypath => 'http://un.nethack.nu/users/$user$/ttyrecs/' },
+   'sporkhack.org' =>
+   { tz => 'UTC',
+     ttypath => 'http://sporkhack.com/ttyrec' },
+   'alt.org' =>
+   { tz => 'UTC',
+     ttypath => 'http://alt.org/nethack/userdata/$user$/ttyrec' }
   );
 
-our %SERVABBREV = (unn => 'http://un.nethack.nu/');
+our %SERVABBREV = (unn => 'http://un.nethack.nu/',
+                   spo => 'http://sporkhack.org/',
+                   nao => 'http://alt.org/nethack/');
 
 sub game_server {
   my $g = shift;
