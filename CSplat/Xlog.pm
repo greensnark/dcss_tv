@@ -94,7 +94,7 @@ sub desc_game_brief {
 
 sub game_unique_key {
   my $g = shift;
-  my $end = $g->{end} || $g->{time};
+  my $end = $g->{endtime} || $g->{currenttime};
   "$g->{name}|$end|$g->{src}"
 }
 

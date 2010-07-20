@@ -139,12 +139,12 @@ sub fetch_game {
 
   $g = xlog_line($g);
 
-  my $start = $g->{start};
+  my $start = $g->{starttime};
   my $nocheck = $g->{nocheck};
   delete $g->{nocheck};
-  delete @$g{qw/start nostart/} if $g->{nostart};
+  delete @$g{qw/starttime nostart/} if $g->{nostart};
   my $result = fetch_ttyrecs($g, $nocheck);
-  $g->{start} = $start;
+  $g->{starttime} = $start;
   if ($result) {
     my $dejafait = $g->{id};
     if ($dejafait) {
