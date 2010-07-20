@@ -43,7 +43,7 @@ $REQUEST_HOST = 'localhost' if $opt{'local-request'};
 my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
                                port => $REQUEST_PORT);
 
-my $TV = CSplat::Termcast->new(name => 'UnTV',
+my $TV = CSplat::Termcast->new(name => 'UnSporkTV',
                                passfile => 'foo.pwd',
                                local => $opt{local});
 
