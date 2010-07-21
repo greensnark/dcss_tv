@@ -467,20 +467,29 @@ sub ttyrec_path {
   $dir . "/" . url_file($url)
 }
 
-sub strip_dec_octet($$$$) {
-  my ($rdec, $rlastesc, $rescseq, $c) = @_;
+sub strip_dec_octet($$$$$) {
+  my ($rdec, $rlastesc, $rescseq, $rcset, $c) = @_;
 
-  $$rescseq = 1 if $$rlastesc && $c eq '[';
+  if ($$rlastesc) {
+    $$rescseq = 1 if $c eq '[';
+    $$rcset = 1 if $c eq '(';
+  }
 
   $$rdec = undef if "\x0f" eq $c && $$rdec;
 
-  if ($$rdec && !$$rescseq) {
+  if ($$rdec && !$$rescseq && !$$rcset) {
     $c =~ tr/\x78\x71\x6c\x6b\x6d\x6a\x6e\x76\x77\x75\x74\x7e\x61\x61\x7b\x67\x7e\x79\x7a\x60\x7e\x60\x7e\x7e\x60\x78\x71\x6f\x78\x78\x73\x6f\x78\x78\x73/\x7c\x2d\x2d\x2d\x2d\x2d\x2d\x2d\x2d\x7c\x7c\x2e\x2d\x7c\x23\x23\x2e\x3c\x3e\x7d\x2e\x7d\x2e\x2e\x7d\x7c\x2d\x2d\x7c\x7c\x2d\x2d\x7c\x7c\x2d/;
   }
 
   if ($c eq "\x0e" && !$$rdec) {
     $$rdec = 1;
     return "\x{0}";
+  }
+
+  if ($$rcset && $c =~ /\w/) {
+    $$rdec = $c eq '0';
+    $c = 'B';
+    $$rcset = undef;
   }
 
   $$rlastesc = $c eq "\x1b";
@@ -495,11 +504,12 @@ sub tv_strip_dec($$) {
   my $escseq = $$ctx{escseq};
   my $dec = $$ctx{dec};
   my $lastesc = $$ctx{lastesc};
+  my $cset = $$ctx{cset};
 
   my $length = length($text);
   for (my $i = 0; $i < $length; ++$i) {
     my $c = substr($text, $i, 1);
-    my $newc = strip_dec_octet(\$dec, \$lastesc, \$escseq, $c);
+    my $newc = strip_dec_octet(\$dec, \$lastesc, \$escseq, \$cset, $c);
     if ($c ne $newc) {
       substr($text, $i, 1) = $newc;
     }
@@ -507,6 +517,7 @@ sub tv_strip_dec($$) {
   $$ctx{escseq} = $escseq;
   $$ctx{dec} = $dec;
   $$ctx{lastesc} = $lastesc;
+  $$ctx{cset} = $cset;
   $text
 }
 
