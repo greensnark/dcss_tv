@@ -237,6 +237,7 @@ sub tty_find_offset_deep {
 
   my $lastclear;
   my $lastgoodclear;
+  my %stripctx;
   while (my $fref = $t->next_frame()) {
     my $frame = $t->frame();
     my $pos = tell($t->filehandle());
@@ -252,7 +253,7 @@ sub tty_find_offset_deep {
     print "Examining frame $frame ($pos / $size)\r" unless $frame % 3031;
 
     if ($building) {
-      tv_cache_frame(tv_frame_strip($fref->{data}));
+      tv_cache_frame(tv_frame_strip(\%stripctx, $fref->{data}));
       unless ($ignore_hp) {
         my ($type, $hp, $maxhp) = frame_full_hp();
         if ($type
@@ -318,6 +319,7 @@ sub tty_find_offset_simple {
 
   my $prev_frame = 0;
   my $clr = clear_screen();
+  my %stripctx;
   while (my $fref = $t->next_frame()) {
     if ($skipsize) {
       my $pos = tell($t->filehandle());
@@ -328,7 +330,7 @@ sub tty_find_offset_simple {
       $lastgoodclear = $pos if $hasclear && $total_size - $pos >= $TTYRMINSZ;
 
       if ($buildup_from && $pos >= $buildup_from) {
-        tv_cache_frame(tv_frame_strip($fref->{data}));
+        tv_cache_frame(tv_frame_strip(\%stripctx, $fref->{data}));
       }
 
       next if $pos < $skipsize;
