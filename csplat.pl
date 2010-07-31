@@ -39,9 +39,11 @@ my @LOG_URLS = ('http://crawl.akrasiac.org/allgames.txt',
                 'http://crawl.akrasiac.org/logfile04',
                 'http://crawl.akrasiac.org/logfile05',
                 'http://crawl.akrasiac.org/logfile06',
-                'http://crawl.develz.org/allgames-0.4.txt',
-                'http://crawl.develz.org/allgames-0.5.txt',
+                'http://crawl.akrasiac.org/logfile07',
+                #'http://crawl.develz.org/allgames-0.4.txt',
+                #'http://crawl.develz.org/allgames-0.5.txt',
                 'http://crawl.develz.org/allgames-0.6.txt',
+                'http://crawl.develz.org/allgames-0.7.txt',
                 'http://crawl.develz.org/allgames-svn.txt',
                );
 
