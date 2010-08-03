@@ -469,7 +469,7 @@ sub ttyrec_path {
 
 sub _strip_dec {
   my $text = shift;
-  $text =~ tr[\x61\x60\x7e\x6e\x7b\xb6\xa7\xbb\xab\xa8][#*.+_\\}{~~];
+  $text =~ tr[\x61\x60\x7e\x6e\x7b\xb6\xa7\xbb\xab\xa8][#*.+_\\}~{{];
   $text
 }
 
@@ -482,7 +482,7 @@ sub tv_frame_strip {
   $rdat =~ s/\xe2\x97\x86/*/g;
 
   # Strip IBM graphics.
-  $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}{/;
+  $rdat =~ tr/\xB1\xB0\xF9\xFA\xFE\xDC\xEF\xF4\xF7/#*.,+_\\}~/;
   $rdat =~ tr/\x0e\x0f//d;
 
   # Strip unicode. Rather pricey :(
