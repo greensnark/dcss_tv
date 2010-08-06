@@ -69,7 +69,9 @@ sub canonical_game_version {
   my $file = $$g{file};
 
   # Not exactly ideal, but what the hell.
-  return 'crawl-0.6' if $file =~ /-0.6/;
+  if ($file =~ /-(\d+(?:[.]\d+)*)/) {
+    return "crawl-$1" unless $1 eq '0.5';
+  }
   return 'trunk' if $file =~ /-trunk/;
   return 'crawl';
 }
