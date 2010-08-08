@@ -68,6 +68,8 @@ sub canonical_game_version {
   my $g = shift;
   my $file = $$g{file};
 
+  return "sprint" if $file =~ /rhf.*-spr/;
+
   # Not exactly ideal, but what the hell.
   if ($file =~ /-(\d+(?:[.]\d+)*)/) {
     return "crawl-$1" unless $1 eq '0.5';
