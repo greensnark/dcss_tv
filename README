@@ -1,0 +1,59 @@
+C-SPLAT
+-------
+
+C-SPLAT examines Crawl logfiles from public servers (URLs currently
+hardcoded in csplat.pl), selects interesting games and plays them back
+on termcast.org in the C-SPLAT channel.
+
+There are two components to C-SPLAT:
+
+1. The game fetch process (csplat.pl):
+
+perl csplat.pl
+
+csplat.pl is the game fetch process that examines games from remote
+logfiles and downloads selected games.
+
+2. The game playback process (tv.pl)
+
+perl tv.pl
+
+tv.pl is the process that picks games from the C-SPLAT database and
+plays them on termcast.org.
+
+To run C-SPLAT, you need to start csplat.pl, give it time to build a
+list of games, then start tv.pl to start playback. Downloaded ttyrecs
+are saved to disk and *never purged*. Watch out for your disk space.
+
+FooTV
+-----
+
+FooTV accepts xlogfile entries from a TV request server (currently the
+server hosting the Sequell bot on Freenode IRC ##crawl). When it
+receives an xlogfile request, it identifies the server hosting that
+game's ttyrecs, downloads the ttyrecs and plays back the game on
+termcast.org, close to the end of the game, or close to the milestone
+event if provided a milestone.
+
+To run FooTV, use:
+
+perl reqtv.pl
+
+You'll first have to edit reqtv.pl to point at the server that
+broadcasts TV requests.
+
+FightClub
+---------
+
+FightClub accepts requests of the form "!fight X v Y", passes the
+request to a slave Crawl process as "crawl -arena 'X v Y", and
+termcasts the resulting arena fight.
+
+To run FightClub, you need a local Crawl binary. Run FightClub as:
+
+CRAWL_HOME=/directory/where/crawl/binary/lives perl arena.pl
+
+FightClub runs its own IRC bot to take bot requests. Edit arena.pl to
+configure the request bot. arena.pl forks an arena-slave.pl process to
+run Crawl and termcast the fight. Edit arena-slave.pl to configure the
+termcast channel, etc.
