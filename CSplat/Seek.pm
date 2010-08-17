@@ -104,6 +104,11 @@ sub tty_frame_offset {
   ($ttr, $offset, $stop_offset, $frame)
 }
 
+sub game_is_milestone($) {
+  my $g = shift;
+  return $$g{mtype};
+}
+
 sub tty_calc_frame_offset {
   my ($g, $deep) = @_;
 
@@ -111,7 +116,7 @@ sub tty_calc_frame_offset {
   print "Seeking (<$seekbefore, >$seekafter) for start frame for ",
     CSplat::Xlog::desc_game($g), "\n";
 
-  my $milestone = $g->{milestone};
+  my $milestone = game_is_milestone($g);
   my $sz = $g->{sz};
 
   my $end_offset;
@@ -122,7 +127,7 @@ sub tty_calc_frame_offset {
     die "Milestone has ", scalar(@ttyrecs), " ttyrecs!\n" if @ttyrecs > 1;
 
     # Work out where exactly the milestone starts.
-    my $mtime = CSplat::Ttyrec::tty_time($g, 'time');
+    my $mtime = CSplat::Ttyrec::tty_time($g, 'currenttime');
     my ($start, $end, $seek_frame_offset) =
       CSplat::Ttyrec::ttyrec_play_time($g, $ttyrecs[0], $mtime);
 
