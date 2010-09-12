@@ -122,16 +122,24 @@ sub fudge_size {
 
 sub uncompress_ttyrec {
   my ($g, $url) = @_;
-  if ($url->{u} =~ /.bz2$/) {
-    system "bunzip2 -f " . ttyrec_path($g, $url->{u})
-      and die "Couldn't bunzip $url->{u}\n";
-    $url->{u} =~ s/\.bz2$//;
+  my $ttyrec_path = ttyrec_path($g, $$url{u});
+  eval {
+    if ($url->{u} =~ /.bz2$/) {
+      system("bunzip2 -f $ttyrec_path")
+        and die "Couldn't bunzip $url->{u}\n";
+      $url->{u} =~ s/\.bz2$//;
+    }
+    if ($url->{u} =~ /.gz$/) {
+      system("gunzip -f $ttyrec_path")
+        and die "Couldn't gunzip $url->{u}\n";
+      $url->{u} =~ s/\.gz$//;
+    }
+  };
+  if ($@) {
+    unlink($ttyrec_path);
+    return 0;
   }
-  if ($url->{u} =~ /.gz$/) {
-    system "gunzip -f " . ttyrec_path($g, $url->{u})
-      and die "Couldn't gunzip $url->{u}\n";
-    $url->{u} =~ s/\.gz$//;
-  }
+  return 1;
 }
 
 sub fetch_url {
@@ -173,7 +181,10 @@ sub download_ttyrecs {
     notify_fetch_listeners("Downloading $url->{u}...");
     my $path = ttyrec_path($g, $url->{u});
     fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
-    uncompress_ttyrec($g, $url);
+    uncompress_ttyrec($g, $url) or do {
+      notify_fetch_listeners("ERROR: Corrupted ttyrec: $$url{u}");
+      return undef;
+    };
     $sz += -s(ttyrec_path($g, $url->{u}));
   }
 
