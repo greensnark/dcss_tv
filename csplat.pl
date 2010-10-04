@@ -1,319 +1,255 @@
 #! /usr/bin/perl
 
-# C-SPLAT by greensnark.
-# Based on TermCastTv 1.2 by Eidolos.
-
 use strict;
 use warnings;
-use File::Path;
-use Date::Manip;
+
 use Getopt::Long;
-use Fcntl qw/SEEK_SET/;
+use CSplat::Config qw/game_server/;
+use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
+                  fetch_all_games record_played_game
+                  clear_played_games query_one/;
+use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
+use CSplat::Ttyrec qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ ttyrec_path
+                      ttyrec_file_time tty_time tv_frame_strip/;
+use CSplat::Select qw/filter_matches make_filter/;
+use CSplat::Seek qw/tty_frame_offset/;
+use CSplat::Termcast;
+use CSplat::Request;
 
-use CSplat::DB qw/open_db fetch_all_games exec_query
-                  query_one in_transaction purge_log_offsets
-                  tty_delete_frame_offset check_dirs/;
-use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
-use CSplat::Ttyrec qw/url_file fetch_url ttyrec_path is_death_ttyrec
-                      ttyrecs_out_of_time_bounds request_download/;
-use CSplat::Xlog qw/xlog_line desc_game/;
-use CSplat::Select qw/interesting_game is_blacklisted filter_matches/;
-use CSplat::Seek qw/tty_frame_offset set_buildup_size/;
+use Term::TtyRec::Plus;
+use IO::Socket::INET;
+use Date::Manip;
 
-# Overall strategy:
-# * Fetch logfiles.
-# * Scan logfiles to pick games. Keep track of logfile offsets.
-# * For selected games, check server to see if we have ttyrecs.
-# * Grab ttyrecs and drop them in ttyrec directory.
-# * Spawn tv once we have X games' worth of ttyrec.
-# * As we load more games, write them into ttyrec dir, update
-#   index card for ttyrecs (with game info).
-# * Strip ibm gfx as we play.
-#
-# Todo:
-# * Overlay to show how much time left?
+use threads;
+use threads::shared;
 
-my $FETCH_ONLY = 0;
+# An appropriately Crawlish number.
+my $PLAYLIST_SIZE = 9;
 
-my @LOG_URLS = ('http://crawl.akrasiac.org/allgames.txt',
-                'http://crawl.akrasiac.org/logfile04',
-                'http://crawl.akrasiac.org/logfile05',
-                'http://crawl.akrasiac.org/logfile06',
-                'http://crawl.akrasiac.org/logfile07',
-                #'http://crawl.develz.org/allgames-0.4.txt',
-                #'http://crawl.develz.org/allgames-0.5.txt',
-                'http://crawl.develz.org/allgames-0.6.txt',
-                'http://crawl.develz.org/allgames-0.7.txt',
-                'http://crawl.develz.org/allgames-svn.txt',
-               );
+# Socket for splat requests.
+my $REQUEST_HOST = 'crawl.akrasiac.org';
+my $REQUEST_PORT = 21976;
 
-my @LOG_FILES = map { m{.*/(.*)} } @LOG_URLS;
+# Games requested for TV.
+my $t_requested_games : shared = '';
 
 my %opt;
-
 # Fetch mode by default.
-GetOptions(\%opt, 'rescan', 'local', 'migrate',
-           'sanity-check', 'sanity-fix', 'filter=s@',
-           're-seek=f', 'default-seek=f', 'purge');
+GetOptions(\%opt, 'local', 'filter=s');
 
-sub seek_log {
-  my $url = shift;
-  my $file = log_path($url);
-  open my $inf, '<', $file or die "Can't read $file: $!\n";
-  my $offset = query_one("SELECT MAX(offset) FROM logplace WHERE logfile = ?",
-                         $url);
-  if ($offset) {
-    print "Seeking to $offset in $file\n";
-    seek $inf, $offset, SEEK_SET
-  }
-  $inf
-}
+$REQUEST_HOST = 'localhost' if $opt{local};
+my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
+                               port => $REQUEST_PORT);
 
-sub read_log {
-  my ($fh, $log) = @_;
-  my $pos = tell $fh;
-  my $line = <$fh>;
-  return unless defined($line) && $line =~ /\n$/;
+my $SERVER      = '213.184.131.118'; # termcast server (probably don't change)
+my $PORT        = 31337;             # termcast port (probably don't change)
+my $NAME        = 'C_SPLAT';         # name to use on termcast
+my $thres       = 3;                 # maximum sleep secs on a ttyrec frame
+my @ALLGAMES;
+my @TVGAMES;
 
-  chomp $line;
-  my $fields = xlog_line($line);
-  $fields->{offset} = $pos;
-  $fields->{src} = $log;
-  $fields
-}
+my $PWFILE = 'tv.pwd';
 
-sub fetch {
-  rescan_games() if $opt{rescan};
-  while (1) {
-    fetch_logs(@LOG_URLS);
-    trawl_games();
-    print "Sleeping between log scans...\n";
-    sleep 600;
-  }
-}
+my $TV = CSplat::Termcast->new(name => $NAME,
+                               passfile => $PWFILE,
+                               local => $opt{local}
+                              );
 
-sub sanity_check_pred {
-  my ($g, $cond, $msg) = @_;
-  if ($cond) {
-    warn "\n$msg: ", desc_game($g), "\n";
-    if ($opt{'sanity-fix'}) {
-      CSplat::DB::delete_game($g);
-    }
-  }
-  $cond
-}
-
-# Goes through all the games we've flagged in the DB, deleting those
-# that don't match interesting_game.
-sub rescan_games {
-  my @games = fetch_all_games(splat => 'y');
-
-  in_transaction(
-    sub {
-      for my $g (@games) {
-        if (!interesting_game($g)) {
-          CSplat::DB::delete_game($g);
-        }
-      }
-
-      purge_log_offsets();
-      } );
-}
-
-sub purge_nonsplats {
-  print "Purging non-splat games...\n";
-  my @games = fetch_all_games(splat => '');
-  for my $g (@games) {
-    CSplat::DB::delete_game($g);
-  }
-
-  print "Purging milestones...\n";
-  @games = fetch_all_games(splat => 'm');
-  for my $g (@games) {
-    CSplat::DB::delete_game($g);
-  }
-}
-
-sub fixup_game_table {
-  my $rows =
-    CSplat::DB::exec_query_all(
-                               'SELECT src, player, gtime, logrecord, id,
-                                       ttyrecs
-                                FROM games');
-
-  my @fixup;
-  for my $row (@$rows) {
-    if (!$row->[0] || !$row->[1] || !$row->[2]) {
-      push @fixup, [ $row->[3], $row->[4] ];
-    }
-  }
-
-  for my $row (@fixup) {
-    my $xlog = $row->[0];
-    my $id = $row->[1];
-    my $g = xlog_line($xlog);
-
-    print "Fixing null fields for game $id\n";
-    CSplat::DB::exec_query('UPDATE games SET src = ?, player = ?, gtime = ?
-                            WHERE id = ?',
-                           $g->{src}, $g->{name}, $g->{end} || $g->{time},
-                           $id);
-  }
-
-  # Register all unregistered ttyrecs.
-  for my $row (@$rows) {
-    my $ttyrecs = $row->[5];
-    my $g = xlog_line($row->[3]);
-    for my $ttyrec (split ' ', $ttyrecs) {
-      CSplat::Ttyrec::check_register_ttyrec($g, $ttyrec);
-    }
-  }
-}
-
-# Check if all the ttyrecs we have are death ttyrecs. If sanity-fix is set,
-# will also delete games that have no death ttyrecs.
-sub sanity_check {
-  fixup_game_table();
-
-  my @games = fetch_all_games(splat => 'y');
-
+sub scan_ttyrec_list {
+  @TVGAMES = @ALLGAMES = fetch_all_games(splat => 'y');
   if ($opt{filter}) {
-    my @chosen;
-
-    for my $filter (@{$opt{filter}}) {
-      my $xlogfilter = xlog_line($filter);
-      push @chosen, grep(filter_matches($xlogfilter, $_), @games);
-    }
-    @games = @chosen;
+    my $filter = xlog_line($opt{filter});
+    @TVGAMES = grep(filter_matches($filter, $_), @TVGAMES);
   }
 
-  if ($opt{'re-seek'}) {
-    my $off = $opt{'re-seek'};
-    set_buildup_size($off);
-  }
-
-  if ($opt{'default-seek'}) {
-    set_default_playback_multiplier($opt{'default-seek'});
-  }
-
-  print "Running sanity-check";
-  print ", will fix errors." if $opt{'sanity-fix'};
-  print "\n";
-
-  # Turn on autoflush.
-  local $| = 1;
-
-  my $gcount = 0;
-  for my $g (@games) {
-    ++$gcount;
-    print "Sanity checking $gcount / ", scalar(@games), "\r";
-
-    my @ttyrecs = split / /, $g->{ttyrecs};
-
-    sanity_check_pred($g, !is_death_ttyrec($g, $ttyrecs[-1]),
-                      "Game has no death ttyrec")
-      ||
-
-        sanity_check_pred($g, ttyrecs_out_of_time_bounds($g),
-                          "Game has out-of-range ttyrecs")
-      ||
-        sanity_check_pred($g, is_blacklisted($g),
-                          "Game is blacklisted");
-
-    next if $g->{deleted};
-
-    tty_delete_frame_offset($g) if $opt{'re-seek'};
-
-    # Find and save the offset and frame into this ttyrec where
-    # playback starts.
-    tty_frame_offset($g, 1);
-  }
-  print "\n";
+  die "No games to play!\n" unless @TVGAMES;
 }
 
-sub migrate_paths {
-  my @games = fetch_all_games();
-  for my $g (@games) {
-    print "Processing ", desc_game($g), "\n";
+sub pick_random_unplayed {
+  @TVGAMES = grep(!$PLAYED_GAMES{$_->{id}}, @TVGAMES);
+  unless (@TVGAMES) {
+    clear_played_games();
+    scan_ttyrec_list();
+  }
+  die "No games?" unless @TVGAMES;
+  my $game = $TVGAMES[int(rand(@TVGAMES))];
+  record_played_game($game);
+  $game
+}
 
-    for my $ttyrec (split / /, $g->{ttyrecs}) {
-      my $old_path = "$TTYREC_DIR/" . url_file($ttyrec);
-      my $new_path = ttyrec_path($g, $ttyrec);
-      if (-f $old_path) {
-        print "Found ttyrec at $old_path, moving it to $new_path\n";
-        rename $old_path, $new_path or die "Couldn't rename $old_path: $!\n";
-      }
+# If there's more than one waiting request from one nick, take only the last
+# request.
+sub squash_splat_requests {
+  my $pref = shift;
+  my @requests = grep($_->{req}, @$pref);
+
+  if (@requests) {
+    my $orig = scalar(@requests);
+    my %dupes;
+    @requests = reverse(grep(!$dupes{$_->{req}}++, reverse(@requests)));
+
+    my %ids;
+    $ids{$_->{id}} = 1 for @requests;
+
+    if (@requests < $orig) {
+      @$pref = grep(!$_->{req} || $ids{$_->{id}}, @$pref);
     }
   }
 }
 
-sub log_path {
-  my $url = shift;
-  $DATA_DIR . "/" . url_file($url)
-}
+sub build_playlist {
+  my $pref = shift;
 
-sub fetch_logs {
-  my @logs = @_;
+  # Check for new ttyrecs in the DB.
+  scan_ttyrec_list();
 
-  for my $log (@logs) {
-    fetch_url($log, log_path($log));
+  my @requested_games = get_requested_games();
+
+  if (@requested_games) {
+    # Any requested games go to the top of the playlist.
+    unshift @$pref, @requested_games;
+
+    # And then we eliminate duplicates.
+    my %ids;
+    @$pref = grep(!$ids{$_->{id}}++, @$pref);
+
+    squash_splat_requests($pref);
+  }
+
+  # Strip games that were in the playlist, but went awol while we were
+  # playing the last game.
+  @$pref = grep(tv_game_exists($_), @$pref);
+
+  while (@$pref < $PLAYLIST_SIZE) {
+    push @$pref, pick_random_unplayed();
   }
 }
 
-sub record_log_place {
-  my ($log, $game) = @_;
-  exec_query("INSERT INTO logplace (logfile, offset)
-              VALUES (?, ?)",
-             $log, $game->{offset});
-  # Discard old records.
-  exec_query("DELETE FROM logplace
-              WHERE logfile = ? AND offset < ?",
-             $log, $game->{offset});
+sub run_tv {
+  load_played_games();
+  run_splat_request_thread();
+
+  my $old;
+  my @playlist;
+  while (1) {
+    build_playlist(\@playlist);
+
+    die "No games to play?" unless @playlist;
+
+    tv_show_playlist(\@playlist, $old);
+    $old = shift @playlist;
+    $TV->play_game($old);
+  }
 }
 
-sub count_existing_games {
-  query_one("SELECT COUNT(*) FROM games WHERE etype='y'")
+# Perform a last-minute check to see if the game is still there.
+sub tv_game_exists {
+  my $g = shift;
+  query_one("SELECT COUNT(*) FROM games WHERE id = ?", $g->{id})
 }
 
-#######################################################################
 
-sub trawl_games {
-  my $lines = 0;
-  my $games = 0;
-  my $existing_games = count_existing_games();
+sub tv_show_playlist {
+  my ($rplay, $prev) = @_;
 
-  for my $log (@LOG_URLS) {
-    # Go to last point that we processed.
-    my $fh = seek_log($log);
-    while (my $game = read_log($fh, $log)) {
+  $TV->clear();
+  if ($prev) {
+    $prev = desc_game_brief($prev);
+    $TV->write("\e[1H\e[1;37mThat was:\e[0m\e[2H\e[1;33m$prev.\e[0m");
+  }
 
-      my $good_game =
-        interesting_game($game, 1) && do {
-          print "Downloading ", desc_game($game), "\n";
-          request_download($game);
-        };
-      $games++ if $good_game;
+  my $pos = 1 + ($prev ? 3 : 0);
+  $TV->write("\e[$pos;1H\e[1;37mComing up:\e[0m");
+  $pos++;
 
-      record_log_place($log, $game);
+  my $first = 1;
+  my @display = @$rplay;
+  if (@display > $PLAYLIST_SIZE) {
+    @display = @display[0 .. ($PLAYLIST_SIZE - 1)];
+  }
+  for my $game (@display) {
+    # Move to right position:
+    $TV->write("\e[$pos;1H",
+               $first? "\e[1;34m" : "\e[0m",
+               desc_game_brief($game));
+    $TV->write("\e[0m") if $first;
+    undef $first;
+    ++$pos;
+  }
 
-      if (!(++$lines % 100)) {
-        my $total = $games + $existing_games;
-        print "Scanned $lines lines, found $total interesting games\n";
-      }
+  sleep(5);
+}
+
+sub find_requested_games {
+  my $games = shift;
+
+  my @games;
+
+  my @requests = map(xlog_line($_), grep(/\S/, split(/\n/, $games)));
+  warn "Got ", scalar(@requests), " new requests\n";
+
+  for my $g (@requests) {
+    delete $g->{start} if $g->{start} gt $g->{end};
+
+    my $gdesc = desc_game($g);
+    warn "Looking for games matching ", $gdesc, "\n";
+
+    my $filter = make_filter($g);
+    my @matches = grep(filter_matches($filter, $_), @ALLGAMES);
+
+    warn "Found ", scalar(@matches), " games for request: ", $gdesc, "\n";
+
+    $_->{req} = $g->{req} for @matches;
+    push(@games, @matches);
+  }
+
+  # Toss duplicate requests.
+  my %seen_ids;
+  grep(!$seen_ids{$_->{id}}++, @games)
+}
+
+sub get_requested_games {
+  my $games;
+  {
+    lock($t_requested_games);
+    ($games) = $t_requested_games =~ /(.*\n)/s;
+    $t_requested_games =~ s/(.*\n)//;
+  }
+
+  return unless $games;
+  find_requested_games($games)
+}
+
+sub check_splat_requests {
+  while (my $game = $REQ->next_request_line()) {
+    my ($g) = $game =~ /^\d+ (.*)/;
+    next unless $g;
+    chomp $g;
+    {
+      lock($t_requested_games);
+      $t_requested_games .= "$g\n";
+      warn "Request: $g\n";
     }
   }
+}
+
+sub run_splat_request_thread {
+  # All requests go to FooTV.
+
+  #my $t = threads->new(\&check_splat_requests);
+  #$t->detach;
+}
+
+sub delta_seconds {
+  my $delta = shift;
+  Delta_Format($delta, 0, "%sh")
+}
+
+sub calc_perc {
+  my ($num, $den) = @_;
+  return "0.0" if $den == 0;
+  sprintf "%.2f%%", ($num * 100 / $den)
 }
 
 open_db();
-if ($opt{migrate}) {
-  migrate_paths();
-}
-elsif ($opt{'sanity-check'}) {
-  sanity_check();
-}
-elsif ($opt{purge}) {
-  purge_nonsplats();
-}
-else {
-  fetch();
-}
+run_tv();
