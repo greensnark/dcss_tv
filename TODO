@@ -1,3 +1,9 @@
+- Cancelable FooTV fetch.
+- Easier interruption of FooTV fetch server (don't daemonize the fetch server).
+- Turn-based seek.
+
+---
+
 Allow FooTV fetch to be canceled:
  - Acknowledge fetch request with a cookie.
  - Report messages for that fetch with that cookie.

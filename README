@@ -7,23 +7,24 @@ on termcast.org in the C-SPLAT channel.
 
 There are two components to C-SPLAT:
 
-1. The game fetch process (csplat.pl):
+1. The game fetch process:
+
+perl csplat-fetch.pl
+
+csplat-fetch.pl is the game fetch process that examines games from
+remote logfiles and downloads selected games.
+
+2. The game playback process (csplat.pl)
 
 perl csplat.pl
 
-csplat.pl is the game fetch process that examines games from remote
-logfiles and downloads selected games.
+csplat.pl is the process that picks games from the C-SPLAT database
+and plays them on termcast.org.
 
-2. The game playback process (tv.pl)
-
-perl tv.pl
-
-tv.pl is the process that picks games from the C-SPLAT database and
-plays them on termcast.org.
-
-To run C-SPLAT, you need to start csplat.pl, give it time to build a
-list of games, then start tv.pl to start playback. Downloaded ttyrecs
-are saved to disk and *never purged*. Watch out for your disk space.
+To run C-SPLAT, you need to start csplat-fetch.pl, give it time to
+build a list of games, then start csplat.pl to start playback.
+Downloaded ttyrecs are saved to disk and *never purged*. Watch out for
+your disk space.
 
 FooTV
 -----
@@ -37,10 +38,12 @@ event if provided a milestone.
 
 To run FooTV, use:
 
-perl reqtv.pl
+perl footv.pl
 
-You'll first have to edit reqtv.pl to point at the server that
+You'll first have to edit footv.pl to point at the server that
 broadcasts TV requests.
+
+
 
 FightClub
 ---------
