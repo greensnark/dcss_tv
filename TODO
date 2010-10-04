@@ -1,0 +1,19 @@
+Allow FooTV fetch to be canceled:
+ - Acknowledge fetch request with a cookie.
+ - Report messages for that fetch with that cookie.
+ - Fetch
+ - Cancel (cookie)
+ - Cancel *
+
+ Commands are processed as they arrive:
+   - <fetch> => add to fetch queue
+   - <fetch> => add to fetch queue
+   - <cancel> => remove from fetch queue. If the fetch is in progress, take
+     it down with a kill.
+
+FooTV lifecycle:
+   - Use a command queue that's processed by one thread that never blocks.
+   - When shutting down, also kill the FooTV fetcher.
+
+Allow FooTV to seek by turn.
+
