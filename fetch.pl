@@ -38,7 +38,9 @@ sub daemonize {
   exit if $pid;
   die "Failed to fork: $!\n" unless defined $pid;
 
-  setsid;
+  # [ds] Say in the same session so that the fetch daemon is killed when the
+  # parent process is killed.
+  #setsid;
   open my $logf, '>', $LOG_FILE or die "Can't write $LOG_FILE: $!\n";
   $logf->autoflush;
   open STDOUT, '>&', $logf or die "Couldn't redirect stdout\n";

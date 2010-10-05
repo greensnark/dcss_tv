@@ -1,4 +1,35 @@
-- Cancelable FooTV fetch.
+Current FooTV fetch:
+  - One playback thread
+  - One request handler/fetch thread:
+    - Handles play requests by synchronous fetch.
+    - Handles cancel requests by adding to the stop list and letting
+      the playback thread worry about stopping. Any queued fetches are
+      also cleared if they match the cancel condition.
+
+When fetch request comes in, the fetch thread makes the request to the
+fetch server.
+
+ Fetch server is currently single-threaded, runs fetches on demand.
+
+Change:
+  - One playback thread (unchanged)
+  - One request handler thread (no longer does fetch):
+    - cancel as before
+    - fetch *spawns* a new fetch thread. Spawned fetch threads are not
+      tracked at all.
+  - Zero or more fetch threads spawned by the request handler:
+    - fetch thread makes synchronous request to fetch server
+
+ Fetch server also goes multi-threaded:
+    - Each fetch request forks a fetch process that operates in parallel
+      with the others. Fetch threads are tracked by the game being fetched.
+    - Cancel requests may also be sent to the fetch server now. When
+      the fetch server sees a cancel request, it kills all fetch processes
+      matching the cancel (or all fetch threads, period if it's a nuke).
+
+- Cancelable FooTV fetch:
+  - cancel based on game (pass game ref to fetch server).
+  - flush
 - Easier interruption of FooTV fetch server (don't daemonize the fetch server).
 - Turn-based seek.
 
