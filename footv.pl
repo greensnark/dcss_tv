@@ -29,7 +29,7 @@ my @queued_playback : shared;
 my @stop_list : shared;
 
 # Fetch mode by default.
-GetOptions(\%opt, 'local', 'local-request');
+GetOptions(\%opt, 'local', 'local-request') or die;
 
 # An appropriately Crawlish number.
 my $PLAYLIST_SIZE = 9;

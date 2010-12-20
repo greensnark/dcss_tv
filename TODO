@@ -1,3 +1,5 @@
+
+
 Current FooTV fetch:
   - One playback thread
   - One request handler/fetch thread:
@@ -53,4 +55,3 @@ FooTV lifecycle:
    - When shutting down, also kill the FooTV fetcher.
 
 Allow FooTV to seek by turn.
-
