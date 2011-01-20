@@ -31,10 +31,11 @@ sub new {
   $self->{host} ||= $TERMCAST_HOST;
   $self->{port} ||= 31337;
 
-  $self->{pass} = read_password($self->{passfile}) if $self->{passfile};
-
-  carp("Need channel name (name) and password (pass)\n")
-    unless $self->{name} && $self->{pass};
+  unless ($self->{local}) {
+    $self->{pass} = read_password($self->{passfile}) if $self->{passfile};
+    carp("Need channel name (name) and password (pass)\n")
+      unless $self->{name} && $self->{pass};
+  }
 
   bless $self, $class;
   $self
