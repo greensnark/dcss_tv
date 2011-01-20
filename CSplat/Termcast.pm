@@ -15,6 +15,8 @@ use IO::Socket::INET;
 use Carp;
 use Fcntl qw/SEEK_SET/;
 
+my $TERMCAST_HOST = 'localhost';
+
 sub read_password {
   my $pwfile = shift;
   chomp(my $text = do { local @ARGV = $pwfile; <> });
@@ -26,7 +28,7 @@ sub new {
   my ($class, @misc) = @_;
   my $self = { @misc };
 
-  $self->{host} ||= '213.184.131.118';
+  $self->{host} ||= $TERMCAST_HOST;
   $self->{port} ||= 31337;
 
   if ($self->{passfile} && !$self->{local}) {
