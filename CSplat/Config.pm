@@ -6,7 +6,7 @@ package CSplat::Config;
 use base 'Exporter';
 our @EXPORT_OK = qw/$DATA_DIR $TTYREC_DIR %SERVMAP
                     $UTC_EPOCH $UTC_BEFORE $UTC_AFTER
-                    $FETCH_PORT server_field game_server
+                    $FETCH_PORT server_field server_list_field game_server
                     resolve_canonical_game_version/;
 
 use Carp;
@@ -39,7 +39,8 @@ our %SERVMAP =
                              dsttz => 'EDT',
                              ttypath => 'http://crawl.akrasiac.org/rawdata' },
    'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
-                           ttypath => 'http://crawl.develz.org/ttyrecs' },
+                           ttypath => [ 'http://termcast.develz.org/ttyrecs',
+                                        'http://crawl.develz.org/ttyrecs' ] },
    'rl.heh.fi' => { tz => 'UTC',
                     ttypath => 'http://rl.heh.fi/$game$/stuff' });
 
@@ -62,6 +63,17 @@ sub server_field {
 
   my $sfield = $SERVMAP{$server} or die "Unknown server: $server\n";
   $sfield->{$field}
+}
+
+sub server_list_field {
+  my ($g, $field) = @_;
+  my $value = server_field($g, $field);
+  if ($value && !ref($value)) {
+    return ($value);
+  }
+  else {
+    return @$value;
+  }
 }
 
 sub canonical_game_version {

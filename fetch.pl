@@ -28,7 +28,7 @@ my $lastsync;
 local $| = 1;
 
 acquire_lock();
-#daemonize();
+daemonize();
 run_fetch();
 
 sub daemonize {
@@ -38,9 +38,9 @@ sub daemonize {
   exit if $pid;
   die "Failed to fork: $!\n" unless defined $pid;
 
-  # [ds] Say in the same session so that the fetch daemon is killed when the
+  # [ds] Stay in the same session so that the fetch daemon is killed when the
   # parent process is killed.
-  #setsid;
+  setsid;
   open my $logf, '>', $LOG_FILE or die "Can't write $LOG_FILE: $!\n";
   $logf->autoflush;
   open STDOUT, '>&', $logf or die "Couldn't redirect stdout\n";

@@ -15,7 +15,7 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     request_cache_clear/;
 
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
-                      $FETCH_PORT server_field game_server
+                      $FETCH_PORT server_field server_list_field game_server
                       resolve_canonical_game_version/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
                     xlog_line xlog_merge/;
@@ -72,14 +72,16 @@ sub clear_cached_urls {
 
 sub have_cached_listing_for_game {
   my $g = shift;
-  my $path = find_game_ttyrec_list_path($g);
-  $CACHED_TTYREC_URLS{$path}
+  my @paths = find_game_ttyrec_list_path($g);
+
+  # Every URL path must be cached:
+  scalar(grep($CACHED_TTYREC_URLS{$_}, @paths)) == @paths
 }
 
 sub clear_cached_urls_for_game {
   my $g = shift;
-  my $path = find_game_ttyrec_list_path($g);
-  delete $CACHED_TTYREC_URLS{$path};
+  my @paths = join(" ", find_game_ttyrec_list_path($g));
+  delete $CACHED_TTYREC_URLS{$_} for @paths;
 }
 
 sub ttyrecs_out_of_time_bounds {
@@ -382,7 +384,7 @@ sub fetch_ttyrecs {
     return;
   }
 
-  # If no start time, restrict to one ttyrec.
+  # If no start time, use only the last ttyrec.
   @ttyrecs = ($ttyrecs[-1]) unless $start;
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @ttyrecs));
@@ -406,20 +408,40 @@ sub fetch_ttyrec_urls_from_server {
   @$rttyrecs
 }
 
+sub fetch_ttyrec_urls_from_multiple_servers {
+  my ($name, $ruserpaths, $time_wanted) = @_;
+
+  if (@$ruserpaths == 1) {
+    return fetch_ttyrec_urls_from_server($name, $$ruserpaths[0], $time_wanted);
+  }
+
+  my %merged_list;
+  for my $server_user_url (@$ruserpaths) {
+    my @ttyrecs = fetch_ttyrec_urls_from_server($name, $server_user_url,
+                                                $time_wanted);
+    $merged_list{$_->{timestr}} = $_ for @ttyrecs;
+  }
+
+  map($merged_list{$_}, sort keys %merged_list)
+}
+
 sub find_game_ttyrec_list_path {
   my $g = shift;
-  my $servpath = server_field($g, 'ttypath');
-  my $userpath = resolve_canonical_game_version("$servpath/$g->{name}", $g);
-  return $userpath;
+  my @servpath = server_list_field($g, 'ttypath');
+  my @userpath =
+    map(resolve_canonical_game_version("$_/$g->{name}", $g),
+        @servpath);
+  return @userpath;
 }
 
 sub find_ttyrecs {
   my $g = shift;
 
-  my $ttyrecurl = find_game_ttyrec_list_path($g);
+  my @ttyrecurls = find_game_ttyrec_list_path($g);
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
   my $time = int(UnixDate($end, "%s"));
-  my @urls = fetch_ttyrec_urls_from_server($g->{name}, $ttyrecurl, $time);
+  my @urls = fetch_ttyrec_urls_from_multiple_servers($g->{name},
+                                                     \@ttyrecurls, $time);
   @urls
 }
 
