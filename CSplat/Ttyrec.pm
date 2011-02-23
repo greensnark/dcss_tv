@@ -149,7 +149,7 @@ sub fetch_url {
   $file ||= url_file($url);
   my $command = "wget -q -c -O $file $url";
   my $status = system($command);
-  die "Error fetching $url: $?\n" if ($status >> 8);
+  die "Error fetching $url: $status\n" if ($status >> 8);
 }
 
 sub download_ttyrecs {
@@ -182,7 +182,13 @@ sub download_ttyrecs {
   for my $url (@tofetch) {
     notify_fetch_listeners("Downloading $url->{u}...");
     my $path = ttyrec_path($g, $url->{u});
-    fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
+    eval {
+      fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
+    };
+    if ($@) {
+      notify_fetch_listeners("ERROR: Failed to fetch $$url{u}: $@");
+      return undef;
+    }
     uncompress_ttyrec($g, $url) or do {
       notify_fetch_listeners("ERROR: Corrupted ttyrec: $$url{u}");
       return undef;
