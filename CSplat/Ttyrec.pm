@@ -149,7 +149,9 @@ sub fetch_url {
   $file ||= url_file($url);
   my $command = "wget -q -c -O $file $url";
   my $status = system($command);
-  die "Error fetching $url: $status\n" if ($status >> 8);
+  my $err = '';
+  $err = " ($!)" if $status == -1;
+  die "Error fetching $url: $status$err\n" if ($status >> 8);
 }
 
 sub download_ttyrecs {
