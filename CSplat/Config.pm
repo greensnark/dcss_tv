@@ -38,7 +38,7 @@ our %SERVMAP =
   ('crawl.akrasiac.org' => {
      tz => 'EST',
      dsttz => 'EDT',
-     ttypath => ['http://termcast.develz.org/crawl.akrasiac.org/ttyrecs',
+     ttypath => ['http://termcast.develz.org/cao/ttyrecs',
                  'http://crawl.akrasiac.org/rawdata'],
 
    },
