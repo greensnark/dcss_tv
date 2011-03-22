@@ -35,9 +35,13 @@ if (-f $RC) {
 print "Fetch port: $FETCH_PORT\n";
 
 our %SERVMAP =
-  ('crawl.akrasiac.org' => { tz => 'EST',
-                             dsttz => 'EDT',
-                             ttypath => 'http://crawl.akrasiac.org/rawdata' },
+  ('crawl.akrasiac.org' => {
+     tz => 'EST',
+     dsttz => 'EDT',
+     ttypath => ['http://termcast.develz.org/crawl.akrasiac.org/ttyrecs',
+                 'http://crawl.akrasiac.org/rawdata'],
+
+   },
    'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
                            ttypath => [ 'http://termcast.develz.org/ttyrecs',
                                         'http://crawl.develz.org/ttyrecs' ] },
