@@ -141,20 +141,6 @@ sub _interesting_game {
   # No matter how high level, ignore Temple deaths.
   return if $g->{place} eq 'Temple';
 
-  my $start = tty_time($g, 'start');
-  my $end = tty_time($g, 'end');
-
-  # dgl start bug, aieee!
-  if ($start gt $end && $fix_time) {
-    # If we have the previous game's end time, use that as our start time.
-    my $pend = $PGAME_CACHE{$g->{src}}{$g->{name}};
-    $g->{start} = $pend if $pend;
-  }
-
-  # If the game was in the hazy date range when Crawl was between
-  # UTC and local time, skip.
-  return if ($end ge $UTC_BEFORE && $end le $UTC_AFTER);
-
   my $xl = $g->{xl};
   my $place = $g->{place};
   my $killer = $g->{killer} || '';
