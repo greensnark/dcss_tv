@@ -15,7 +15,7 @@ use IO::Socket::INET;
 use Carp;
 use Fcntl qw/SEEK_SET/;
 
-my $TERMCAST_HOST = 'localhost';
+my $TERMCAST_HOST = 'termcast.develz.org';
 
 sub read_password {
   my $pwfile = shift;
