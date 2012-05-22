@@ -95,11 +95,10 @@ sub desc_game_brief {
   my $xl = "$$g{xl}";
   $xl = " $xl" if length($xl) == 1;
   # Name, Title, XL, God, place, tmsg.
-  my @pieces = (pad(10, $$g{name}),
+  my @pieces = (pad(20, $$g{name}),
                 "L$xl $$g{char}",
-                pad_god(8, $$g{god}),
-                pad(7, $$g{place}),
-                $$g{tmsg} || $$g{milestone});
+                pad_god(12, $$g{god}),
+                pad(8, $$g{place}));
   @pieces = grep($_, @pieces);
   my $text = join("  ", @pieces);
   $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
