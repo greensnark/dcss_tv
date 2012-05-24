@@ -27,6 +27,7 @@ use LWP::Simple;
 use File::Path;
 use IO::Socket::INET;
 use Term::TtyRec::Plus;
+use Tie::Cache;
 
 # Smallest cumulative length of ttyrec that's acceptable.
 our $TTYRMINSZ = 95 * 1024;
@@ -42,8 +43,8 @@ our $TTYRDEFSZ = 130 * 1024;
 my $BZ2X = 11;
 my $GZX = 6.6;
 
-my %CACHED_TTYREC_URLS;
-my %FETCHED_GAMES;
+tie my %CACHED_TTYREC_URLS, 'Tie::Cache', { MaxCount => 200 };
+tie my %FETCHED_GAMES, 'Tie::Cache', { MaxCount => 200 };
 
 my @FETCH_LISTENERS;
 
