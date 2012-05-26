@@ -63,7 +63,6 @@ sub download_game {
   my $start = $g->{start};
   warn "Downloading ttyrecs for ", desc_game($g), "\n";
 
-  $g->{nostart} = 'y';
   $g->{nocheck} = 'y';
   return undef unless request_download($g, \&download_notifier);
   delete @$g{qw/nostart nocheck/};

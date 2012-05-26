@@ -9,3 +9,4 @@ TAGS
 *.pwd
 *.req
 .fetch.lock
+*.sw[op]

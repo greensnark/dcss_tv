@@ -362,8 +362,7 @@ sub fetch_ttyrecs {
   }
 
   my $start = tty_time($g, 'start');
-  my $end = tty_time($g, 'end');
-  $end ||= tty_time($g, 'time');
+  my $end = tty_time($g, 'end') || tty_time($g, 'time');
 
   my @ttyrecs;
 
