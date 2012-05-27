@@ -349,6 +349,28 @@ sub find_existing_ttyrec {
                         $g->{src}, $g->{name}, $end, $end)
 }
 
+sub ttyrecs_filter_between {
+  my ($game_start, $end, @ttyrecs) = @_;
+
+  # The first ttyrec for a game usually has a timestamp preceding the
+  # actual game start time, since dgl opens the ttyrec file before
+  # Crawl starts. To work around this, we resolve the game start time to
+  # the ttyrec start time that is closest to the start time and <= to it.
+
+  my $start;
+  if ($game_start) {
+    for my $ttyrec (reverse @ttyrecs) {
+      my $time = ttyrec_file_time($$ttyrec{u});
+      if ($time le $game_start) {
+        $game_start = $time;
+        last;
+      }
+    }
+  }
+
+  grep(ttyrec_between($_->{u}, $start, $end), @ttyrecs)
+}
+
 sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
 
@@ -386,17 +408,17 @@ sub fetch_ttyrecs {
     return;
   };
 
-  @ttyrecs = grep(ttyrec_between($_->{u}, $start, $end), @ttyrecs);
-  unless (@ttyrecs) {
+  my @filtered_ttyrecs = ttyrecs_filter_between($start, $end, @ttyrecs);
+  unless (@filtered_ttyrecs) {
     warn "No ttyrecs between $start and $end for ", desc_game($g), "\n";
     return;
   }
 
   # If no start time, use only the last ttyrec.
-  @ttyrecs = ($ttyrecs[-1]) unless $start;
+  @filtered_ttyrecs = ($filtered_ttyrecs[-1]) unless $start;
 
-  $g->{ttyrecs} = join(" ", map($_->{u}, @ttyrecs));
-  $g->{ttyrecurls} = \@ttyrecs;
+  $g->{ttyrecs} = join(" ", map($_->{u}, @filtered_ttyrecs));
+  $g->{ttyrecurls} = \@filtered_ttyrecs;
   download_ttyrecs($g, $no_death_check)
 }
 
