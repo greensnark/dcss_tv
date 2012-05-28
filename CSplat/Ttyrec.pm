@@ -8,8 +8,8 @@ use base 'Exporter';
 
 our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     clear_cached_urls ttyrec_path url_file
-                    ttyrec_file_time tty_time fetch_ttyrecs
-                    update_fetched_games fetch_url record_game
+                    ttyrec_file_time fetch_ttyrecs
+                    update_fetched_games record_game
                     tv_frame_strip is_death_ttyrec
                     ttyrecs_out_of_time_bounds request_download
                     request_cache_clear/;
@@ -20,6 +20,8 @@ use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
                     xlog_hash xlog_merge/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
+use CSplat::Fetch qw/fetch_url/;
+use CSplat::TtyTime qw/tty_time/;
 use CSplat::TtyrecList;
 use Carp;
 use Date::Manip;
@@ -34,7 +36,7 @@ our $TTYRMINSZ = 95 * 1024;
 
 # Largest cumulative length of ttyrec. The longer it gets, the harder we
 # have to work to seek to the fun parts.
-our $TTYRMAXSZ = 500 * 1024 * 1024;
+our $TTYRMAXSZ = 1024 * 1024 * 1024;
 
 # Default ttyrec length.
 our $TTYRDEFSZ = 130 * 1024;
@@ -145,32 +147,29 @@ sub uncompress_ttyrec {
   return 1;
 }
 
-sub fetch_url {
-  my ($url, $file) = @_;
-  $file ||= url_file($url);
-  my $command = "wget -q -c -O $file $url";
-  my $status = system($command);
-  my $err = '';
-  $err = " ($!)" if $status == -1;
-  die "Error fetching $url: $status$err\n" if ($status >> 8);
-}
-
 sub download_ttyrecs {
-  my ($g, $no_checks) = @_;
+  my ($g, $no_checks, $turn_seek) = @_;
 
   my $sz = 0;
 
   my @ttyrs = reverse @{$g->{ttyrecurls}};
 
   my @tofetch;
+
+  my $first_ttyrec_time = $turn_seek && $turn_seek->start_time();
   for my $tty (@ttyrs) {
-    last if $sz >= $TTYRDEFSZ;
+    last if !$first_ttyrec_time && $sz >= $TTYRDEFSZ;
 
     my $ttysz = $tty->{sz};
     $ttysz = fudge_size($ttysz, $tty->{u});
     $sz += $ttysz;
 
     push @tofetch, $tty;
+
+    if ($first_ttyrec_time &&
+        ttyrec_file_time($tty->{u}) lt $first_ttyrec_time) {
+      last;
+    }
   }
 
   if ($sz > $TTYRMAXSZ || (!$no_checks && $sz < $TTYRMINSZ)) {
@@ -371,10 +370,22 @@ sub ttyrecs_filter_between {
   grep(ttyrec_between($_->{u}, $start, $end), @ttyrecs)
 }
 
+sub game_turn_based_seek {
+  my $g = shift;
+  CSplat::TurnSeek->new($g)
+}
+
 sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
+
+  my $turn_seek = game_turn_based_seek($g);
+
+  if ($turn_seek) {
+    $start = $turn_seek->start_time() || $start;
+    $end = $turn_seek->end_time() || $end;
+  }
 
   my @ttyrecs;
 
@@ -409,7 +420,7 @@ sub fetch_ttyrecs {
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @filtered_ttyrecs));
   $g->{ttyrecurls} = \@filtered_ttyrecs;
-  download_ttyrecs($g, $no_death_check)
+  download_ttyrecs($g, $no_death_check, $turn_seek)
 }
 
 sub fetch_ttyrec_urls_from_server {
@@ -463,32 +474,6 @@ sub find_ttyrecs_for_game_player {
   my @urls = fetch_ttyrec_urls_from_multiple_servers($g->{name},
                                                      \@ttyrecurls, $time);
   @urls
-}
-
-sub tty_tz_time {
-  my ($g, $time) = @_;
-  my $dst = $time =~ /D$/;
-  $time =~ s/[DS]$//;
-
-  my $tz = server_field($g, $dst? 'dsttz' : 'tz');
-  ParseDate("$time $tz")
-}
-
-sub tty_time {
-  my ($g, $which) = @_;
-
-  my $raw = $g->{$which};
-  return unless $raw;
-
-  my $time = fix_crawl_time($raw);
-  (my $stripped = $time) =~ s/[DS]$//;
-
-  # First parse it as UTC.
-  my $parsed = ParseDate("$stripped UTC");
-
-  # If it was before the UTC epoch, parse it as the appropriate local time.
-  $parsed = tty_tz_time($g, $time) if $parsed lt $UTC_EPOCH;
-  $parsed
 }
 
 sub ttyrec_file_time {
@@ -604,6 +589,10 @@ sub send_download_request {
       next;
     }
 
+    if ($response =~ /^FAIL (.*)/) {
+      chomp(my $text = $1);
+      $listener->("ERROR: $text") if $listener;
+    }
     return undef unless ($response || '') =~ /OK/;
 
     chomp $response;

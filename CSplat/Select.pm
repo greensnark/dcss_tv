@@ -11,7 +11,7 @@ our @EXPORT_OK = qw/is_blacklisted interesting_game filter_matches
 
 use CSplat::Config qw/$UTC_BEFORE $UTC_AFTER/;
 use CSplat::Xlog qw/xlog_hash desc_game/;
-use CSplat::Ttyrec qw/tty_time/;
+use CSplat::TtyTime qw/tty_time/;
 
 my $BLACKLIST = 'blacklist.txt';
 my $SPLAT_HOME = $ENV{SPLAT_HOME};

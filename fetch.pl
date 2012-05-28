@@ -15,7 +15,7 @@ use CSplat::Ttyrec qw/update_fetched_games clear_cached_urls fetch_ttyrecs
 use CSplat::Seek qw/tty_frame_offset/;
 use CSplat::Select qw/interesting_game/;
 use CSplat::DB qw/open_db/;
-use CSplat::Xlog qw/xlog_line xlog_str desc_game/;
+use CSplat::Xlog qw/xlog_hash xlog_str desc_game/;
 
 use POSIX;
 
@@ -28,7 +28,7 @@ my $lastsync;
 local $| = 1;
 
 acquire_lock();
-daemonize();
+#daemonize();
 run_fetch();
 
 sub daemonize {
@@ -53,14 +53,16 @@ sub acquire_lock {
   my $failmsg =
     "Failed to lock $LOCK_FILE: another fetch daemon may be running\n";
   eval {
-    local $SIG{ALRM} =
-      sub {
-        die "alarm\n";
-      };
-    alarm 3;
+    # local $SIG{ALRM} =
+    #   sub {
+    #     die "alarm\n";
+    #   };
+    # alarm 3;
 
+    print "Trying to lock $LOCK_FILE\n";
     open $LOCK_HANDLE, '>', $LOCK_FILE or die "Couldn't open $LOCK_FILE: $!\n";
     flock $LOCK_HANDLE, LOCK_EX or die $failmsg;
+    print "Locked $LOCK_FILE\n";
   };
   die $failmsg if $@ eq "alarm\n";
 }
@@ -74,6 +76,7 @@ sub sync_games {
 }
 
 sub run_fetch {
+  print "Starting fetch service\n";
   open_db();
   sync_games();
 
@@ -102,17 +105,19 @@ sub process_command {
   if ($cmd eq 'G') {
     my ($game) = $command =~ /^\w+ (.*)/;
 
-    my $g = xlog_line($game);
+    my $g = xlog_hash($game);
     my $have_cache = CSplat::Ttyrec::have_cached_listing_for_game($g);
 
     my $res;
     eval {
       $res = fetch_game($client, $game)
     };
+    warn "$@" if $@;
     if ($@ && $have_cache) {
-      warn "$@";
       CSplat::Ttyrec::clear_cached_urls_for_game($g);
       $res = fetch_game($client, $game);
+    } elsif ($@) {
+      print $client "FAIL $@\n";
     }
     $res
   }
@@ -139,7 +144,7 @@ sub fetch_game {
   CSplat::Ttyrec::clear_fetch_listeners();
   CSplat::Ttyrec::add_fetch_listener(sub { fetch_notifier($client, $g, @_) });
 
-  $g = xlog_line($g);
+  $g = xlog_hash($g);
 
   my $start = $g->{start};
   my $nocheck = $g->{nocheck};
@@ -158,18 +163,9 @@ sub fetch_game {
     # If the game already has an id, it's already been registered
     record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
 
-    my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
-    $seekafter = '$' if $seekafter == -100;
-    CSplat::Ttyrec::notify_fetch_listeners(
-        "Scanning ttyrec for " .
-        "start frame (<$seekbefore, >$seekafter)...");
-
-    eval {
-      tty_frame_offset($g, 1);
-    };
     if ($@) {
-      CSplat::DB::delete_game($g);
       warn $@;
+      CSplat::DB::delete_game($g);
       print $client "FAIL $@\n";
     }
     else {

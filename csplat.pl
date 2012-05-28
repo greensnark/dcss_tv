@@ -8,7 +8,7 @@ use CSplat::Config qw/game_server/;
 use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
                   fetch_all_games record_played_game
                   clear_played_games query_one/;
-use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
+use CSplat::Xlog qw/desc_game desc_game_brief xlog_hash xlog_str/;
 use CSplat::Ttyrec qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ ttyrec_path
                       ttyrec_file_time tty_time tv_frame_strip/;
 use CSplat::Select qw/filter_matches make_filter/;
@@ -58,7 +58,7 @@ my $TV = CSplat::Termcast->new(name => $NAME,
 sub scan_ttyrec_list {
   @TVGAMES = @ALLGAMES = fetch_all_games(splat => 'y');
   if ($opt{filter}) {
-    my $filter = xlog_line($opt{filter});
+    my $filter = xlog_hash($opt{filter});
     @TVGAMES = grep(filter_matches($filter, $_), @TVGAMES);
   }
 
@@ -185,7 +185,7 @@ sub find_requested_games {
 
   my @games;
 
-  my @requests = map(xlog_line($_), grep(/\S/, split(/\n/, $games)));
+  my @requests = map(xlog_hash($_), grep(/\S/, split(/\n/, $games)));
   warn "Got ", scalar(@requests), " new requests\n";
 
   for my $g (@requests) {

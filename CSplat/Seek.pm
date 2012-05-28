@@ -10,6 +10,9 @@ our @EXPORT_OK = qw/tty_frame_offset clear_screen set_buildup_size/;
 use CSplat::DB qw/tty_precalculated_frame_offset tty_save_frame_offset/;
 use CSplat::Ttyrec qw/ttyrec_path $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
 use CSplat::Xlog qw/desc_game_brief/;
+use CSplat::TurnSeek;
+use CSplat::GameTimestamp;
+use CSplat::TtyPlayRange;
 
 use Term::VT102;
 use Term::TtyRec::Plus;
@@ -96,12 +99,8 @@ sub tv_frame {
 
 sub tty_frame_offset {
   my ($g, $deep) = @_;
-  my ($ttr, $offset, $stop_offset, $frame) = tty_precalculated_frame_offset($g);
-  unless ($ttr && $offset && $frame) {
-    ($ttr, $offset, $stop_offset, $frame) = tty_calc_frame_offset($g, $deep);
-    tty_save_frame_offset($g, $ttr, $offset, $stop_offset, $frame) if $deep;
-  }
-  ($ttr, $offset, $stop_offset, $frame)
+  my $play_range = tty_calc_frame_offset($g, $deep);
+  $play_range
 }
 
 sub tty_calc_frame_offset {
@@ -112,65 +111,102 @@ sub tty_calc_frame_offset {
     CSplat::Xlog::desc_game($g), "\n";
 
   my $milestone = $g->{milestone};
-  my $sz = $g->{sz};
+  my $size_before_playback_frame = $g->{sz};
 
-  my $end_offset;
+  my ($start_offset, $end_offset, $start_ttyrec, $end_ttyrec);
 
   my @ttyrecs = split / /, $g->{ttyrecs};
 
-  if ($milestone) {
-    die "Milestone has ", scalar(@ttyrecs), " ttyrecs!\n" if @ttyrecs > 1;
+  $end_ttyrec = $ttyrecs[$#ttyrecs];
 
+  my $turn_seek = CSplat::TurnSeek->new($g);
+
+  # For regular games, the implicit end time is the end of the last ttyrec.
+  # For milestones and turn-based TV requests, the end time is explicit:
+  my $explicit_end_time = $turn_seek && $turn_seek->end_time();
+  if ($explicit_end_time) {
     # Work out where exactly the milestone starts.
-    my $mtime = CSplat::Ttyrec::tty_time($g, 'time');
     my ($start, $end, $seek_frame_offset) =
-      CSplat::Ttyrec::ttyrec_play_time($g, $ttyrecs[0], $mtime);
+      CSplat::Ttyrec::ttyrec_play_time($g, $end_ttyrec, $explicit_end_time);
 
     die "Broken ttyrec\n" unless defined($start) && defined($end);
 
     # The frame involving the milestone should be treated as EOF.
-    $sz = $seek_frame_offset;
-    $end_offset = $sz;
+    $end_offset = $seek_frame_offset;
   }
 
-  my $skipsize = 0;
+  my $explicit_start_time = $turn_seek && $turn_seek->start_time();
+  if ($explicit_start_time) {
+    $start_ttyrec = $ttyrecs[0];
+    my ($start, $end, $seek_frame_offset) =
+      CSplat::Ttyrec::ttyrec_play_time($g, $start_ttyrec, $explicit_start_time);
+    $start_offset = $seek_frame_offset;
+  }
 
-  my $defsz = $milestone ? $MS_SEEK_BEFORE : $TTYRDEFSZ;
+  if (!defined($start_offset)) {
+    $start_offset = $end_offset || $size_before_playback_frame;
+    $start_ttyrec = $end_ttyrec;
+  }
 
-  # If the game itself requests a specific seek, oblige.
-  $defsz *= $seekbefore;
+  $size_before_playback_frame = 0;
+  for my $ttyrec (split / /, $g->{ttyrecs}) {
+    my $ttyrec_size = -s(ttyrec_path($g, $ttyrec));
+    if ($ttyrec eq $start_ttyrec) {
+      $size_before_playback_frame += $start_offset;
+      last;
+    }
+    $size_before_playback_frame += $ttyrec_size;
+  }
+
+  my $playback_skip_size = 0;
+  my $playback_prelude_size = $explicit_end_time ? $MS_SEEK_BEFORE : $TTYRDEFSZ;
+
+  if ($explicit_start_time) {
+    $playback_prelude_size = 0;
+  } else {
+    # If the game itself requests a specific seek, oblige.
+    $playback_prelude_size *= $seekbefore unless $explicit_start_time;
+  }
 
   my $delbuildup = $BUILDUP_SIZE - $TTYRDEFSZ;
 
-  local $BUILDUP_SIZE = $defsz + $delbuildup;
+  local $BUILDUP_SIZE = $playback_prelude_size + $delbuildup;
 
-  if ($sz > $defsz) {
-    $skipsize = $sz - $defsz;
+  if ($size_before_playback_frame > $playback_prelude_size) {
+    $playback_skip_size = $size_before_playback_frame - $playback_prelude_size;
   }
 
   for my $ttyrec (split / /, $g->{ttyrecs}) {
-    my $thisz = -s(ttyrec_path($g, $ttyrec));
-    if ($skipsize >= $thisz) {
-      $skipsize -= $thisz;
-      $sz -= $thisz;
+    my $ttyrec_size = -s(ttyrec_path($g, $ttyrec));
+    if ($playback_skip_size >= $ttyrec_size) {
+      $playback_skip_size -= $ttyrec_size;
+      $size_before_playback_frame -= $ttyrec_size;
       next;
     }
 
-    my $ignore_hp = $milestone;
-
+    my $ignore_hp = $explicit_end_time;
     my ($ttr, $offset, $stop_offset, $frame) =
-      tty_calc_offset_in($g, $deep, $ttyrec, $sz, $skipsize, $ignore_hp);
+      tty_calc_offset_in($g, $deep, $ttyrec, $size_before_playback_frame,
+                         $playback_skip_size, $ignore_hp);
 
     # Seek won't presume to set a stop offset, so do so here.
-    if ($milestone && !defined($stop_offset) && defined($end_offset)
+    if ($explicit_end_time && !defined($stop_offset) && defined($end_offset)
         && $seekafter != -100)
     {
       print "Seek after: $seekafter\n";
-      my $endpad = $MS_SEEK_AFTER;
-      $endpad *= $seekafter;
-      $stop_offset = $end_offset + $endpad;
+      if ($turn_seek && $turn_seek->end_turn()) {
+        $stop_offset = $end_offset;
+      } else {
+        my $endpad = $MS_SEEK_AFTER;
+        $endpad *= $seekafter;
+        $stop_offset = $end_offset + $endpad;
+      }
     }
-    return ($ttr, $offset, $stop_offset, $frame);
+    return CSplat::TtyPlayRange->new(start_file => $ttr,
+                                     start_offset => $offset,
+                                     end_file => $end_ttyrec,
+                                     end_offset => $stop_offset,
+                                     frame => $frame);
   }
   confess "Argh, wtf?\n";
   # WTF?

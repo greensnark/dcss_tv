@@ -18,7 +18,7 @@ die "No filter specified\n" unless $opt{filter};
 CSplat::DB::open_db();
 
 my @games = CSplat::DB::fetch_all_games(splat => '*');
-my $xlfil = CSplat::Xlog::xlog_line($opt{filter});
+my $xlfil = CSplat::Xlog::xlog_hash($opt{filter});
 
 @games = grep(CSplat::Select::filter_matches($xlfil, $_), @games);
 

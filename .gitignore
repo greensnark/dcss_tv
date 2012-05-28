@@ -10,3 +10,4 @@ TAGS
 *.req
 .fetch.lock
 *.sw[op]
+*.ts

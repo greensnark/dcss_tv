@@ -16,7 +16,7 @@ use CSplat::DB qw/open_db fetch_all_games exec_query
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
 use CSplat::Ttyrec qw/url_file fetch_url ttyrec_path is_death_ttyrec
                       ttyrecs_out_of_time_bounds request_download/;
-use CSplat::Xlog qw/xlog_line desc_game/;
+use CSplat::Xlog qw/xlog_hash desc_game/;
 use CSplat::Select qw/interesting_game is_blacklisted filter_matches/;
 use CSplat::Seek qw/tty_frame_offset set_buildup_size/;
 
@@ -76,7 +76,7 @@ sub read_log {
   return unless defined($line) && $line =~ /\n$/;
 
   chomp $line;
-  my $fields = xlog_line($line);
+  my $fields = xlog_hash($line);
   $fields->{offset} = $pos;
   $fields->{src} = $log;
   $fields
@@ -151,7 +151,7 @@ sub fixup_game_table {
   for my $row (@fixup) {
     my $xlog = $row->[0];
     my $id = $row->[1];
-    my $g = xlog_line($xlog);
+    my $g = xlog_hash($xlog);
 
     print "Fixing null fields for game $id\n";
     CSplat::DB::exec_query('UPDATE games SET src = ?, player = ?, gtime = ?
@@ -163,7 +163,7 @@ sub fixup_game_table {
   # Register all unregistered ttyrecs.
   for my $row (@$rows) {
     my $ttyrecs = $row->[5];
-    my $g = xlog_line($row->[3]);
+    my $g = xlog_hash($row->[3]);
     for my $ttyrec (split ' ', $ttyrecs) {
       CSplat::Ttyrec::check_register_ttyrec($g, $ttyrec);
     }
@@ -181,7 +181,7 @@ sub sanity_check {
     my @chosen;
 
     for my $filter (@{$opt{filter}}) {
-      my $xlogfilter = xlog_line($filter);
+      my $xlogfilter = xlog_hash($filter);
       push @chosen, grep(filter_matches($xlogfilter, $_), @games);
     }
     @games = @chosen;

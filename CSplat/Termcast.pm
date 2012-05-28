@@ -4,6 +4,7 @@ use warnings;
 package CSplat::Termcast;
 
 use base 'Exporter';
+use lib '..';
 
 our @EXPORT_OK;
 
@@ -14,6 +15,7 @@ use IO::Handle;
 use IO::Socket::INET;
 use Carp;
 use Fcntl qw/SEEK_SET/;
+use Data::Dumper;
 
 my $TERMCAST_HOST = 'termcast.develz.org';
 
@@ -128,7 +130,6 @@ sub play_ttyrec {
   my ($self, $g, $ttyfile, $offset, $stop_offset, $frame) = @_;
 
   $self->write($frame) if $frame;
-
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
@@ -162,7 +163,7 @@ sub play_ttyrec {
 sub play_game {
   my ($self, $g) = @_;
 
-  my ($ttr, $offset, $stop_offset, $frame) =
+  my $playback_range =
     eval {
       tty_frame_offset($g)
     };
@@ -174,16 +175,30 @@ sub play_game {
     $self->write("Ttyrec appears corrupted.");
   }
 
-  $stop_offset ||= 0;
-
   $self->clear();
   $self->reset();
 
   my $skipping = 1;
   for my $ttyrec (split / /, $g->{ttyrecs}) {
+    my $start_file = $playback_range->start_file() eq $ttyrec;
+    my $end_file = $playback_range->end_file() eq $ttyrec;
+
     if ($skipping) {
-      next if $ttr ne $ttyrec;
+      next if !$start_file;
       undef $skipping;
+    }
+
+    my $offset = 0;
+    my $stop_offset;
+    my $frame;
+
+    if ($start_file) {
+      $offset = $playback_range->start_offset();
+      $frame = $playback_range->frame();
+    }
+
+    if ($end_file) {
+      $stop_offset = $playback_range->end_offset();
     }
 
     eval {
@@ -192,9 +207,7 @@ sub play_game {
     };
     warn "$@\n" if $@;
 
-    undef $offset;
-    undef $stop_offset;
-    undef $frame;
+    last if $end_file;
   }
 }
 

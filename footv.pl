@@ -5,7 +5,7 @@ use warnings;
 
 use Getopt::Long;
 use CSplat::DB qw/open_db/;
-use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
+use CSplat::Xlog qw/desc_game desc_game_brief xlog_hash xlog_str/;
 use CSplat::Ttyrec qw/request_download/;
 use CSplat::Select qw/filter_matches make_filter/;
 use CSplat::Termcast;
@@ -79,7 +79,7 @@ sub next_request {
     my $filter = CSplat::Select::make_filter($g);
     $filter = { } if $g->{nuke};
     @queued_playback =
-      grep(!CSplat::Select::filter_matches($filter, xlog_line($_)),
+      grep(!CSplat::Select::filter_matches($filter, xlog_hash($_)),
            @queued_playback);
 
     warn "Adding ", desc_game($g), " to stop list\n";
@@ -147,7 +147,7 @@ sub cancel_playing_games {
       return 'stop';
     }
 
-    my @filters = map(CSplat::Select::make_filter(xlog_line($_)), @stop);
+    my @filters = map(CSplat::Select::make_filter(xlog_hash($_)), @stop);
 
     if (grep(CSplat::Select::filter_matches($_, $g), @filters)) {
       return 'stop';
@@ -160,7 +160,7 @@ sub update_status {
   my $xlog = $line !~ /^msg: /;
 
   if ($xlog) {
-    my $f = xlog_line($line);
+    my $f = xlog_hash($line);
     if (($f->{cancel} || '') eq 'y') {
       if ($f->{nuke}) {
         $TV->write("\e[1;35mPlaylist clear by $f->{req}\e[0m\r\n");
@@ -221,7 +221,7 @@ sub request_tv {
       }
 
       if (@queued_playback) {
-        my @copy = map(xlog_line($_), @queued_playback);
+        my @copy = map(xlog_hash($_), @queued_playback);
         tv_show_playlist(\@copy, $last_game);
         sleep 4 if $slept == 0;
         last;
@@ -234,7 +234,7 @@ sub request_tv {
 
     my $line = shift(@queued_playback);
     if ($line) {
-      my $g = xlog_line($line);
+      my $g = xlog_hash($line);
       $TV->play_game($g);
       $last_game = $g;
     }
