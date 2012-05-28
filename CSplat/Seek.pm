@@ -137,11 +137,6 @@ sub tty_calc_frame_offset {
 
   my $defsz = $milestone ? $MS_SEEK_BEFORE : $TTYRDEFSZ;
 
-  # Give more seekback to Zot games.
-  if ($g->{place} =~ /^Zot/) {
-    $defsz *= 2;
-  }
-
   # If the game itself requests a specific seek, oblige.
   $defsz *= $seekbefore;
 
