@@ -18,7 +18,7 @@ use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
                       $FETCH_PORT server_field server_list_field game_server
                       resolve_canonical_game_version/;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
-                    xlog_line xlog_merge/;
+                    xlog_hash xlog_merge/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use CSplat::TtyrecList;
 use Carp;
@@ -373,16 +373,6 @@ sub ttyrecs_filter_between {
 
 sub fetch_ttyrecs {
   my ($g, $no_death_check) = @_;
-
-  # Check if we already have the game.
-  my $fetched = game_was_fetched($g);
-  if ($fetched) {
-    my $clone = { %$fetched };
-    delete $$clone{seekbefore};
-    delete $$clone{seekafter};
-    return xlog_merge($g, $clone);
-  }
-
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
 
@@ -403,7 +393,7 @@ sub fetch_ttyrecs {
     }
   }
 
-  @ttyrecs = find_ttyrecs($g) or do {
+  @ttyrecs = find_ttyrecs_for_game_player($g) or do {
     print "No ttyrecs on server for ", desc_game($g), "?\n";
     return;
   };
@@ -464,7 +454,7 @@ sub find_game_ttyrec_list_path {
   return @userpath;
 }
 
-sub find_ttyrecs {
+sub find_ttyrecs_for_game_player {
   my $g = shift;
 
   my @ttyrecurls = find_game_ttyrec_list_path($g);
@@ -618,7 +608,7 @@ sub send_download_request {
 
     chomp $response;
     my ($xlog) = $response =~ /^OK (.*)/;
-    xlog_merge($g, xlog_line($xlog));
+    xlog_merge($g, xlog_hash($xlog));
   }
   1
 }

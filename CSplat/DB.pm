@@ -5,15 +5,16 @@ use DBI;
 
 package CSplat::DB;
 use base 'Exporter';
+use lib '..';
 
 our @EXPORT_OK = qw/%PLAYED_GAMES exec_query exec_do exec_all
                     in_transaction query_one open_db
                     load_played_games fetch_all_games record_played_game
                     clear_played_games purge_log_offsets
-                    tty_find_frame_offset tty_save_frame_offset
+                    tty_precalculated_frame_offset tty_save_frame_offset
                     tty_delete_frame_offset last_row_id check_dirs/;
 
-use CSplat::Xlog qw/xlog_line/;
+use CSplat::Xlog qw/xlog_hash/;
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
 use File::Path;
 
@@ -173,7 +174,7 @@ sub delete_game {
   $g->{deleted} = 'y';
 }
 
-sub tty_find_frame_offset {
+sub tty_precalculated_frame_offset {
   my $g = shift;
 
   my ($pre, $post) = game_seek_multipliers($g);
@@ -222,7 +223,7 @@ sub fetch_all_games {
   my @games;
   for my $row (@$rows) {
     my $id = $row->[0];
-    my $g = xlog_line($row->[1]);
+    my $g = xlog_hash($row->[1]);
     $g->{ttyrecs} = $row->[2];
     $g->{id} = $id;
     $g->{splat} = $pars{splat};

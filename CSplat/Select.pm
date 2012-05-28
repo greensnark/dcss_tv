@@ -10,7 +10,7 @@ our @EXPORT_OK = qw/is_blacklisted interesting_game filter_matches
                     make_filter/;
 
 use CSplat::Config qw/$UTC_BEFORE $UTC_AFTER/;
-use CSplat::Xlog qw/xlog_line desc_game/;
+use CSplat::Xlog qw/xlog_hash desc_game/;
 use CSplat::Ttyrec qw/tty_time/;
 
 my $BLACKLIST = 'blacklist.txt';
@@ -27,7 +27,7 @@ sub load_blacklist {
   open my $inf, '<', $BLACKLIST or return;
   while (<$inf>) {
     next unless /\S/ and !/^\s*#/;
-    my $game = xlog_line($_);
+    my $game = xlog_hash($_);
     push @BLACKLISTED, $game;
   }
   close $inf;
@@ -48,7 +48,7 @@ sub make_filter {
     # Make a copy so we don't mess with the original.
     $filter = { %$filter };
   } else {
-    $filter = xlog_line($filter);
+    $filter = xlog_hash($filter);
   }
 
   my @keys = keys %$filter;

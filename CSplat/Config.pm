@@ -40,13 +40,21 @@ our %SERVMAP =
      dsttz => 'EDT',
      ttypath => ['http://termcast.develz.org/cao/ttyrecs',
                  'http://crawl.akrasiac.org/rawdata'],
-
+     timestamp_path => ['http://crawl.akrasiac.org/rawdata']
    },
-   'crawl.develz.org' => { tz => 'CET', dsttz => 'CEST',
-                           ttypath => [ 'http://termcast.develz.org/ttyrecs',
-                                        'http://crawl.develz.org/ttyrecs' ] },
-   'rl.heh.fi' => { tz => 'UTC',
-                    ttypath => 'http://rl.heh.fi/$game$/stuff' });
+   'crawl.develz.org' => {
+     tz => 'CET', dsttz => 'CEST',
+     ttypath => ['http://termcast.develz.org/ttyrecs',
+                 'http://crawl.develz.org/ttyrecs' ],
+     timestamp_path => ['http://crawl.develz.org/morgues/trunk',
+                        'http://crawl.develz.org/morgues/0.10',
+                        'http://crawl.develz.org/morgues/0.9',
+                        'http://crawl.develz.org/morgues/0.8',
+                        'http://crawl.develz.org/morgues/0.7',
+                        'http://crawl.develz.org/morgues/0.6',
+                        'http://crawl.develz.org/morgues/0.5',
+                        'http://crawl.develz.org/morgues/0.4']
+   });
 
 our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
                    cdo => 'http://crawl.develz.org/',

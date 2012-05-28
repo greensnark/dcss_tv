@@ -10,7 +10,7 @@ our @EXPORT_OK;
 use IO::Socket::INET;
 use Carp;
 
-use CSplat::Xlog qw/xlog_line/;
+use CSplat::Xlog qw/xlog_hash/;
 
 sub new {
   my $class = shift;
@@ -69,7 +69,7 @@ sub next_request {
     };
     warn "$@" if $@;
     if ($line =~ /^\d+ (.*)/) {
-      my $g = xlog_line($1);
+      my $g = xlog_hash($1);
       # The id here will be Henzell's game id, which is sharply distinct
       # from our own game id, so toss it.
       delete $$g{id};

@@ -4,7 +4,7 @@ use warnings;
 package CSplat::Xlog;
 
 use base 'Exporter';
-our @EXPORT_OK = qw/xlog_line desc_game desc_game_brief
+our @EXPORT_OK = qw/xlog_hash desc_game desc_game_brief
                     fix_crawl_time game_unique_key xlog_str
                     xlog_merge/;
 
@@ -16,7 +16,7 @@ sub fix_crawl_time {
   $time
 }
 
-sub xlog_line {
+sub xlog_hash {
   chomp(my $text = shift);
   $text =~ s/::/\n/g;
   my @fields = map { (my $x = $_) =~ tr/\n/:/; $x } split /:/, $text;

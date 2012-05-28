@@ -7,7 +7,7 @@ use lib '..';
 
 our @EXPORT_OK = qw/tty_frame_offset clear_screen set_buildup_size/;
 
-use CSplat::DB qw/tty_find_frame_offset tty_save_frame_offset/;
+use CSplat::DB qw/tty_precalculated_frame_offset tty_save_frame_offset/;
 use CSplat::Ttyrec qw/ttyrec_path $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
 use CSplat::Xlog qw/desc_game_brief/;
 
@@ -96,7 +96,7 @@ sub tv_frame {
 
 sub tty_frame_offset {
   my ($g, $deep) = @_;
-  my ($ttr, $offset, $stop_offset, $frame) = tty_find_frame_offset($g);
+  my ($ttr, $offset, $stop_offset, $frame) = tty_precalculated_frame_offset($g);
   unless ($ttr && $offset && $frame) {
     ($ttr, $offset, $stop_offset, $frame) = tty_calc_frame_offset($g, $deep);
     tty_save_frame_offset($g, $ttr, $offset, $stop_offset, $frame) if $deep;

@@ -4,14 +4,10 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use CSplat::Config qw/game_server/;
-use CSplat::DB qw/%PLAYED_GAMES load_played_games open_db
-                  fetch_all_games record_played_game
-                  clear_played_games query_one/;
+use CSplat::DB qw/open_db/;
 use CSplat::Xlog qw/desc_game desc_game_brief xlog_line xlog_str/;
 use CSplat::Ttyrec qw/request_download/;
-use CSplat::Select qw/filter_matches make_filter interesting_game/;
-use CSplat::Seek qw/tty_frame_offset/;
+use CSplat::Select qw/filter_matches make_filter/;
 use CSplat::Termcast;
 use CSplat::Request;
 use Term::TtyRec::Plus;
