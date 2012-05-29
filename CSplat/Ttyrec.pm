@@ -129,15 +129,18 @@ sub uncompress_ttyrec {
   my ($g, $url) = @_;
   my $ttyrec_path = ttyrec_path($g, $$url{u});
   eval {
+    my $urlstr = $url->{u};
+    $urlstr =~ s/\.(?:bz2|gz)$//;
+    my $uncompressed_path = ttyrec_path($g, $urlstr);
     if ($url->{u} =~ /.bz2$/) {
-      system("bunzip2 -f $ttyrec_path")
+      system("bunzip2 -k -f $ttyrec_path")
         and die "Couldn't bunzip $url->{u}\n";
-      $url->{u} =~ s/\.bz2$//;
+      $url->{u} = $uncompressed_path;
     }
     if ($url->{u} =~ /.gz$/) {
-      system("gunzip -f $ttyrec_path")
+      system("gunzip -c $ttyrec_path >$uncompressed_path")
         and die "Couldn't gunzip $url->{u}\n";
-      $url->{u} =~ s/\.gz$//;
+      $url->{u} = $uncompressed_path;
     }
   };
   if ($@) {
