@@ -178,7 +178,7 @@ sub fetch_game {
     }
   } else {
     print "Failed to download ", desc_game($g), "\n";
-    print $client "FAIL\n";
+    die "Failed to download game\n";
   }
   CSplat::Ttyrec::clear_fetch_listeners();
 }
