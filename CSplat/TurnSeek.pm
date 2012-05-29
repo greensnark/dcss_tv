@@ -40,6 +40,12 @@ sub initialize {
   $self->{start_time} = tty_time($g, 'start');
   # No defined end_time if this is not a milestone:
   $self->{end_time} = tty_time($g, 'time');
+
+  # For milestones, if there is a defined end-time, make the start time the
+  # milestone time.
+  if ($end && $self->{end_time}) {
+    $self->{start_time} = $self->{end_time};
+  }
 }
 
 sub resolve_turn {
