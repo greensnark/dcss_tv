@@ -28,7 +28,7 @@ my $lastsync;
 local $| = 1;
 
 acquire_lock();
-#daemonize();
+daemonize();
 run_fetch();
 
 sub daemonize {
