@@ -135,12 +135,12 @@ sub uncompress_ttyrec {
     if ($url->{u} =~ /.bz2$/) {
       system("bunzip2 -k -f $ttyrec_path")
         and die "Couldn't bunzip $url->{u}\n";
-      $url->{u} = $uncompressed_path;
+      $url->{u} =~ s/\.bz2$//;
     }
     if ($url->{u} =~ /.gz$/) {
       system("gunzip -c $ttyrec_path >$uncompressed_path")
         and die "Couldn't gunzip $url->{u}\n";
-      $url->{u} = $uncompressed_path;
+      $url->{u} =~ s/\.gz$//;
     }
   };
   if ($@) {
@@ -420,6 +420,9 @@ sub fetch_ttyrecs {
 
   # If no start time, use only the last ttyrec.
   @filtered_ttyrecs = ($filtered_ttyrecs[-1]) unless $start;
+
+  # Copy the hashes so we can modify them safely.
+  @filtered_ttyrecs = map({ %$_ }, @filtered_ttyrecs);
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @filtered_ttyrecs));
   $g->{ttyrecurls} = \@filtered_ttyrecs;
