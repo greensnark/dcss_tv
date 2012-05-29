@@ -165,7 +165,7 @@ sub tty_calc_frame_offset {
   my $playback_skip_size = 0;
   my $playback_prelude_size = $explicit_end_time ? $MS_SEEK_BEFORE : $TTYRDEFSZ;
 
-  if ($explicit_start_time) {
+  if ($explicit_start_time && $turn_seek->hard_start_time()) {
     $playback_prelude_size = 0;
   } else {
     # If the game itself requests a specific seek, oblige.

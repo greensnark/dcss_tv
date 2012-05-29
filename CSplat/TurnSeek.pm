@@ -91,6 +91,12 @@ sub start_time {
     $self->{milestone_start_time}
 }
 
+# Returns true if the start time is a hard start-here-dammit time.
+sub hard_start_time {
+  my $self = shift;
+  defined($self->{start})
+}
+
 sub end_time {
   my $self = shift;
   my $end = $self->end_turn();
