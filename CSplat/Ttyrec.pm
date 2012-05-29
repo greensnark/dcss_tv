@@ -422,7 +422,7 @@ sub fetch_ttyrecs {
   @filtered_ttyrecs = ($filtered_ttyrecs[-1]) unless $start;
 
   # Copy the hashes so we can modify them safely.
-  @filtered_ttyrecs = map({ %$_ }, @filtered_ttyrecs);
+  @filtered_ttyrecs = map { { %$_ } } @filtered_ttyrecs;
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @filtered_ttyrecs));
   $g->{ttyrecurls} = \@filtered_ttyrecs;
