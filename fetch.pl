@@ -113,10 +113,15 @@ sub process_command {
       $res = fetch_game($client, $game)
     };
     warn "$@" if $@;
-    if ($@) {
+    if ($@ && $have_cache) {
       CSplat::Ttyrec::clear_cached_urls_for_game($g);
-      $res = fetch_game($client, $game);
-    } elsif ($@) {
+      eval {
+        $res = fetch_game($client, $game);
+      };
+      warn "$@" if $@;
+    }
+
+    if ($@) {
       print $client "FAIL $@\n";
     }
     $res
