@@ -44,7 +44,7 @@ sub initialize {
   # For milestones, if there is a defined end-time, make the start time the
   # milestone time.
   if ($end && $self->{end_time}) {
-    $self->{start_time} = $self->{end_time};
+    $self->{milestone_start_time} = $self->{end_time};
   }
 }
 
@@ -87,7 +87,8 @@ sub timestamp {
 sub start_time {
   my $self = shift;
   my $start = $self->start_turn();
-  $start && $self->timestamp()->timestamp_for_turn($start)
+  $start && $self->timestamp()->timestamp_for_turn($start) ||
+    $self->{milestone_start_time}
 }
 
 sub end_time {
