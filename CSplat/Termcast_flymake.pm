@@ -137,8 +137,7 @@ sub play_ttyrec {
   seek($t->filehandle(), $offset, SEEK_SET) if $offset;
 
   my $cancelled = 0;
-
- PLAYBACK:
+PLAYBACK:
   while (my $fref = $t->next_frame()) {
     select undef, undef, undef, $fref->{diff};
     $self->write(tv_frame_strip($fref->{data}));
