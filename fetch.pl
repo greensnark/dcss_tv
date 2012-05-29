@@ -113,7 +113,7 @@ sub process_command {
       $res = fetch_game($client, $game)
     };
     warn "$@" if $@;
-    if ($@ && $have_cache) {
+    if ($@) {
       CSplat::Ttyrec::clear_cached_urls_for_game($g);
       $res = fetch_game($client, $game);
     } elsif ($@) {

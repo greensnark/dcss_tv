@@ -361,7 +361,7 @@ sub ttyrecs_filter_between {
     for my $ttyrec (reverse @ttyrecs) {
       my $time = ttyrec_file_time($$ttyrec{u});
       if ($time le $game_start) {
-        $game_start = $time;
+        $start = $time;
         last;
       }
     }
