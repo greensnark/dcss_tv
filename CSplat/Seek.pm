@@ -111,14 +111,13 @@ sub tty_calc_frame_offset {
     CSplat::Xlog::desc_game($g), "\n";
 
   my $milestone = $g->{milestone};
-  my $size_before_playback_frame = 0;
-
   my ($start_offset, $end_offset, $start_ttyrec, $end_ttyrec);
 
   my @ttyrecs = split / /, $g->{ttyrecs};
 
+  my $ttyrec_total_size = 0;
   for my $ttyrec (@ttyrecs) {
-    $size_before_playback_frame += -s(ttyrec_path($g, $ttyrec));
+    $ttyrec_total_size += -s(ttyrec_path($g, $ttyrec));
   }
 
   $end_ttyrec = $ttyrecs[$#ttyrecs];
@@ -152,7 +151,7 @@ sub tty_calc_frame_offset {
     $start_ttyrec = $end_ttyrec;
   }
 
-  $size_before_playback_frame = 0;
+  my $size_before_playback_frame = 0;
   for my $ttyrec (@ttyrecs) {
     my $ttyrec_size = -s(ttyrec_path($g, $ttyrec));
     if ($ttyrec eq $start_ttyrec) {
@@ -178,6 +177,9 @@ sub tty_calc_frame_offset {
 
   if ($size_before_playback_frame > $playback_prelude_size) {
     $playback_skip_size = $size_before_playback_frame - $playback_prelude_size;
+    if ($playback_skip_size >= $ttyrec_total_size) {
+      $playback_skip_size = $ttyrec_total_size - 1;
+    }
   }
 
   for my $ttyrec (@ttyrecs) {
