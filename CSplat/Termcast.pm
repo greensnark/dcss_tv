@@ -176,7 +176,12 @@ sub play_game {
 
   if ($@) {
     $self->clear();
-    $self->write("Ttyrec appears corrupted.");
+    $self->write("Ttyrec appears corrupted.\r\n");
+  }
+
+  if (!$playback_range) {
+    $self->write("Could not find playback range, aborting.\r\n");
+    return;
   }
 
   $self->clear();
