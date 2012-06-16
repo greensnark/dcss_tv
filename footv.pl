@@ -34,6 +34,7 @@ my $PLAYLIST_SIZE = 9;
 my $REQUEST_HOST = $ENV{PLAYLIST_HOST} || '127.0.0.1';
 my $REQUEST_PORT = $ENV{PLAYLIST_PORT} || 21976;
 my $TERMCAST_CHANNEL = $ENV{TERMCAST_CHANNEL} || 'FooTV';
+my $REQUEST_IRC_CHANNEL = $ENV{REQUEST_IRC_CHANNEL} || '##crawl';
 
 $REQUEST_HOST = 'localhost' if $opt{'local-request'};
 
@@ -210,7 +211,7 @@ sub request_tv {
       $TV->write("\e[0m\r\n\r\n");
     }
 
-    $TV->write("Waiting for requests (use !tv on ##crawl to request a game).");
+    $TV->write("Waiting for requests (use !tv on $REQUEST_IRC_CHANNEL to request a game).");
     $TV->write("\r\n\r\n");
 
     my $slept = 0;
