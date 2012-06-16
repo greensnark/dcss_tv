@@ -4,7 +4,7 @@ use warnings;
 package CSplat::GameTimestamp;
 use lib '..';
 
-use CSplat::Config qw/$TTYREC_DIR/;
+use CSplat::Config qw/$TTYREC_DIR resolve_player_directory/;
 use CSplat::Fetch;
 use CSplat::Xlog qw/desc_game_brief/;
 use CSplat::TtyTime qw/tty_time/;
@@ -96,7 +96,7 @@ sub timestamp_paths {
   my $self = shift;
   my $g = $self->{g};
   my $timestamp_file = timestamp_filename($g);
-  map("$_/$$g{name}/$timestamp_file",
+  map(resolve_player_directory($_, $g) . "/$timestamp_file",
       CSplat::Config::server_list_field($g, 'timestamp_path'))
 }
 

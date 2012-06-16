@@ -6,6 +6,7 @@ package CSplat::TtyrecList;
 use base 'Exporter';
 use LWP::Simple;
 use IO::Socket::INET;
+use CSplat::Config;
 
 our @EXPORT_OK = qw/fetch_listing/;
 
@@ -23,7 +24,7 @@ sub fetch_listing {
   my ($nick, $server_url) = @_;
   my $server = get_server($server_url);
 
-  if (!$HTTP_FETCH{$server}) {
+  if (!$HTTP_FETCH{$server} && !CSplat::Config::http_fetch_only($server)) {
     my $rttyrec = direct_fetch($nick, $server, $server_url);
     return $rttyrec if $rttyrec;
 
@@ -80,6 +81,7 @@ sub clean_ttyrec_url {
 
 sub human_readable_size {
   my $size = shift;
+  s/^\s+//, s/\s+$// for $size;
   my ($suffix) = $size =~ /([KMG])$/i;
   $size =~ s/[KMG]$//i;
   if ($suffix) {
@@ -106,7 +108,7 @@ sub http_fetch {
     return;
   };
   print "Done fetching HTTP listing for $nick\n";
-  my (@urlsizes) = $listing =~ /<\s*a\s+href\s*=\s*["']([^"']*?ttyrec[^"']*?)["'].*?(\d+(?:\.\d+)?[kMB])/gis;
+  my (@urlsizes) = $listing =~ /<\s*a\s+href\s*=\s*["']([^"']*?ttyrec[^"']*?)["'].*?(\d+(?:\.\d+)?[kMB]|\s\d+\s)/gis;
   my @urls;
   for (my $i = 0; $i < @urlsizes; $i += 2) {
     my $url = $urlsizes[$i];

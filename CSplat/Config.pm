@@ -7,7 +7,7 @@ use base 'Exporter';
 our @EXPORT_OK = qw/$DATA_DIR $TTYREC_DIR %SERVMAP
                     $UTC_EPOCH $UTC_BEFORE $UTC_AFTER
                     $FETCH_PORT server_field server_list_field game_server
-                    resolve_canonical_game_version/;
+                    resolve_player_directory/;
 
 use Carp;
 use Date::Manip;
@@ -38,27 +38,35 @@ our %SERVMAP =
   ('crawl.akrasiac.org' => {
      tz => 'EST',
      dsttz => 'EDT',
-     ttypath => ['http://termcast.develz.org/cao/ttyrecs',
-                 'http://crawl.akrasiac.org/rawdata'],
-     timestamp_path => ['http://crawl.akrasiac.org/rawdata']
+     ttypath => ['http://termcast.develz.org/cao/ttyrecs/$player$',
+                 'http://crawl.akrasiac.org/rawdata/$player$'],
+     timestamp_path => ['http://crawl.akrasiac.org/rawdata/$player$']
    },
    'crawl.develz.org' => {
      tz => 'CET', dsttz => 'CEST',
-     ttypath => ['http://termcast.develz.org/ttyrecs',
-                 'http://crawl.develz.org/ttyrecs' ],
-     timestamp_path => ['http://crawl.develz.org/morgues/trunk',
-                        'http://crawl.develz.org/morgues/0.10',
-                        'http://crawl.develz.org/morgues/0.9',
-                        'http://crawl.develz.org/morgues/0.8',
-                        'http://crawl.develz.org/morgues/0.7',
-                        'http://crawl.develz.org/morgues/0.6',
-                        'http://crawl.develz.org/morgues/0.5',
-                        'http://crawl.develz.org/morgues/0.4']
-   });
+     ttypath => ['http://termcast.develz.org/ttyrecs/$player$',
+                 'http://crawl.develz.org/ttyrecs/$player$' ],
+     timestamp_path => ['http://crawl.develz.org/morgues/trunk/$player$',
+                        'http://crawl.develz.org/morgues/0.10/$player$',
+                        'http://crawl.develz.org/morgues/0.9/$player$',
+                        'http://crawl.develz.org/morgues/0.8/$player$',
+                        'http://crawl.develz.org/morgues/0.7/$player$',
+                        'http://crawl.develz.org/morgues/0.6/$player$',
+                        'http://crawl.develz.org/morgues/0.5/$player$',
+                        'http://crawl.develz.org/morgues/0.4/$player$']
+   },
+   'light.bitprayer.com' => {
+     http_fetch_only => 1,
+     tz => 'UTC', dsttz => 'UTC',
+     ttypath => ['http://light.bitprayer.com/userdata/$player$/ttyrec'],
+     timestamp_path => ['http://light.bitprayer.com/userdata/$player$/morgue']
+   }
+);
 
 our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
                    cdo => 'http://crawl.develz.org/',
-                   rhf => 'http://rl.heh.fi/');
+                   rhf => 'http://rl.heh.fi/',
+                   lbc => 'http://light.bitprayer.com/');
 
 sub game_server {
   my $g = shift;
@@ -69,12 +77,22 @@ sub game_server {
   $server
 }
 
+sub server_config {
+  my $server = shift;
+  $SERVMAP{$server} or die "Unknown server: $server\n"
+}
+
 sub server_field {
   my ($g, $field) = @_;
   my $server = game_server($g);
-
-  my $sfield = $SERVMAP{$server} or die "Unknown server: $server\n";
+  my $sfield = server_config($server);
   $sfield->{$field}
+}
+
+sub http_fetch_only {
+  my $server = shift;
+  my $server_config = server_config($server);
+  $server_config->{http_fetch_only}
 }
 
 sub server_list_field {
@@ -102,10 +120,17 @@ sub canonical_game_version {
   return 'crawl';
 }
 
-sub resolve_canonical_game_version {
-  my ($path, $g) = @_;
-  if ($path =~ /\$game\$/) {
-    $path =~ s/\$game\$/ canonical_game_version($g) /ge;
-  }
-  return $path;
+sub resolve_game_field {
+  my ($field, $g) = @_;
+  return canonical_game_version($g) if $field eq 'game';
+  $field = 'name' if $field eq 'player';
+  $$g{$field}
 }
+
+sub resolve_player_directory {
+  my ($url, $g) = @_;
+  $url =~ s/\$(\w+)\$/ resolve_game_field($1, $g) /ge;
+  $url
+}
+
+1
