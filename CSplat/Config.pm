@@ -79,7 +79,7 @@ sub game_server {
 
 sub server_config {
   my $server = shift;
-  $SERVMAP{$server} or die "Unknown server: $server\n"
+  $SERVMAP{$server}
 }
 
 sub server_field {
@@ -92,7 +92,7 @@ sub server_field {
 sub http_fetch_only {
   my $server = shift;
   my $server_config = server_config($server);
-  $server_config->{http_fetch_only}
+  $server_config && $server_config->{http_fetch_only}
 }
 
 sub server_list_field {
