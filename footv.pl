@@ -31,16 +31,17 @@ GetOptions(\%opt, 'local', 'local-request') or die;
 my $PLAYLIST_SIZE = 9;
 
 # Socket for splat requests.
-my $REQUEST_HOST = '127.0.0.1';
-my $REQUEST_PORT = 21976;
+my $REQUEST_HOST = $ENV{PLAYLIST_HOST} || '127.0.0.1';
+my $REQUEST_PORT = $ENV{PLAYLIST_PORT} || 21976;
+my $TERMCAST_CHANNEL = $ENV{TERMCAST_CHANNEL} || 'FooTV';
 
 $REQUEST_HOST = 'localhost' if $opt{'local-request'};
 
 my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
                                port => $REQUEST_PORT);
 
-my $TV = CSplat::Termcast->new(name => 'FooTV',
-                               passfile => 'foo.pwd',
+my $TV = CSplat::Termcast->new(name => $TERMCAST_CHANNEL,
+                               passfile => "$TERMCAST_CHANNEL.pwd",
                                local => $opt{local});
 
 sub get_game_matching {
