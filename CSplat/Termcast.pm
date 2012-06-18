@@ -17,11 +17,12 @@ use Carp;
 use Fcntl qw/SEEK_SET/;
 use Data::Dumper;
 
-my $TERMCAST_HOST = 'termcast.develz.org';
+my $TERMCAST_HOST = $ENV{TERMCAST_HOST} || 'termcast.develz.org';
 
 sub read_password {
   my $pwfile = shift;
-  chomp(my $text = do { local @ARGV = $pwfile; <> });
+  open my $inf, '<', $pwfile or die "Can't read $pwfile: $!\n";
+  chomp(my $text = <$inf>);
   die "No password for termcast login?\n" unless $text;
   $text
 }
@@ -92,7 +93,7 @@ sub reconnect {
   warn "Unable to connect: $!\n" unless defined $SOCK;
   return unless defined($SOCK);
 
-  print "Sending handshake to server...\n";
+  print "Sending handshake to server for $self->{name}...\n";
   # Try to send the handshake
   print $SOCK "hello $self->{name} $self->{pass}\n";
 

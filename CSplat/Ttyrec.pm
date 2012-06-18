@@ -3,13 +3,15 @@ use warnings;
 
 package CSplat::Ttyrec;
 
+use threads;
+use threads::shared;
+
 use lib '..';
 use base 'Exporter';
 
 our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     clear_cached_urls ttyrec_path url_file
                     ttyrec_file_time fetch_ttyrecs
-                    update_fetched_games record_game
                     tv_frame_strip is_death_ttyrec
                     ttyrecs_out_of_time_bounds request_download
                     request_cache_clear/;
@@ -45,22 +47,15 @@ our $TTYRDEFSZ = 130 * 1024;
 my $BZ2X = 11;
 my $GZX = 6.6;
 
-tie my %CACHED_TTYREC_URLS, 'Tie::Cache', { MaxCount => 200 };
-tie my %FETCHED_GAMES, 'Tie::Cache', { MaxCount => 200 };
+my $CACHE_MAX = 25;
+my %CACHED_TTYREC_URLS :shared;
 
 my @FETCH_LISTENERS;
 
-sub add_fetch_listener {
-  push @FETCH_LISTENERS, @_;
-}
-
-sub clear_fetch_listeners {
-  @FETCH_LISTENERS = ();
-}
-
-sub notify_fetch_listeners {
+sub notify_fetch_listener {
+  my $listener = shift;
   warn "Notify: ", @_, "\n";
-  $_->(@_) for @FETCH_LISTENERS;
+  $listener->(@_);
 }
 
 sub url_file {
@@ -151,7 +146,7 @@ sub uncompress_ttyrec {
 }
 
 sub download_ttyrecs {
-  my ($g, $no_checks, $turn_seek) = @_;
+  my ($listener, $g, $no_checks, $turn_seek) = @_;
 
   my $sz = 0;
 
@@ -185,17 +180,17 @@ sub download_ttyrecs {
   print "Downloading ", scalar(@tofetch), " ttyrecs for ", desc_game($g), "\n";
   $sz = 0;
   for my $url (@tofetch) {
-    notify_fetch_listeners("Downloading $url->{u}...");
+    notify_fetch_listener($listener, "Downloading $url->{u}...");
     my $path = ttyrec_path($g, $url->{u});
     eval {
       fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
     };
     if ($@) {
-      notify_fetch_listeners("ERROR: Failed to fetch $$url{u}: $@");
+      notify_fetch_listener($listener, "ERROR: Failed to fetch $$url{u}: $@");
       return undef;
     }
     uncompress_ttyrec($g, $url) or do {
-      notify_fetch_listeners("ERROR: Corrupted ttyrec: $$url{u}");
+      notify_fetch_listener($listener, "ERROR: Corrupted ttyrec: $$url{u}");
       return undef;
     };
     $sz += -s(ttyrec_path($g, $url->{u}));
@@ -206,7 +201,7 @@ sub download_ttyrecs {
     for my $ttyrec (@tofetch) {
       unlink ttyrec_path($g, $ttyrec->{u});
     }
-    notify_fetch_listeners("Game has no death ttyrec: " . desc_game($g));
+    notify_fetch_listener($listener, "Game has no death ttyrec: " . desc_game($g));
     return undef;
   }
 
@@ -214,41 +209,7 @@ sub download_ttyrecs {
   $g->{ttyrecs} = join(" ", map($_->{u}, @tofetch));
   $g->{ttyrecurls} = \@tofetch;
 
-  for my $ttyrec (split / /, $g->{ttyrecs}) {
-    register_ttyrec($g, $ttyrec);
-  }
-
   1
-}
-
-sub record_game {
-  my ($game, $splat) = @_;
-
-  die "Must specify splattiness\n" unless defined $splat;
-
-  my $req = $game->{req};
-  delete $game->{req} if $req;
-  record_fetched_game($game);
-
-  exec_query("INSERT INTO games (src, player, gtime, logrecord, ttyrecs, etype)
-              VALUES (?, ?, ?, ?, ?, ?)",
-             $game->{src}, $game->{name}, $game->{end} || $game->{time},
-             xlog_str($game), $game->{ttyrecs}, $splat);
-  my $id = last_row_id();
-  $game->{req} = $req;
-  $game->{id} = $id;
-}
-
-# Registers a ttyrec if it is not already registered.
-sub check_register_ttyrec {
-  my ($g, $ttyrec) = @_;
-  my $row =
-    CSplat::DB::exec_query_all('SELECT * FROM ttyrec WHERE ttyrec = ?',
-                               $ttyrec);
-  if (!$row || @$row == 0) {
-    print "Registering ttyrec $ttyrec\n";
-    register_ttyrec($g, $ttyrec);
-  }
 }
 
 sub ttyrec_play_time {
@@ -302,55 +263,6 @@ sub ttyrec_play_time {
   ($start, $end, $seek_frame_offset)
 }
 
-sub register_ttyrec {
-  my ($g, $ttyrec, $seektime) = @_;
-  my ($start, $end, $seek_offset) = ttyrec_play_time($g, $ttyrec, $seektime);
-
-  eval {
-    # First kill any existing registration.
-    exec_query('DELETE FROM ttyrec WHERE ttyrec = ?', $ttyrec);
-  };
-
-  eval {
-    exec_query('INSERT INTO ttyrec (ttyrec, src, player, stime, etime)
-                VALUES (?, ?, ?, ?, ?)',
-               $ttyrec, $g->{src}, $g->{name}, $start, $end);
-  };
-  warn $@ if $@;
-  $seek_offset
-}
-
-sub unregister_ttyrec {
-  my ($g, $ttyrec) = @_;
-  exec_query('DELETE FROM ttyrec WHERE ttyrec = ?', $ttyrec)
-}
-
-sub record_fetched_game {
-  my $g = shift;
-  $FETCHED_GAMES{game_unique_key($g)} = $g;
-}
-
-sub update_fetched_games {
-  %FETCHED_GAMES = ();
-  my @games = fetch_all_games(splat => '*');
-  for my $g (@games) {
-    record_fetched_game($g);
-  }
-}
-
-sub game_was_fetched {
-  my $g = shift;
-  $FETCHED_GAMES{game_unique_key($g)}
-}
-
-sub find_existing_ttyrec {
-  my ($g, $end) = @_;
-  CSplat::DB::query_one("SELECT ttyrec FROM ttyrec
-                         WHERE src = ? AND player = ?
-                           AND stime <= ? AND etime >= ?",
-                        $g->{src}, $g->{name}, $end, $end)
-}
-
 sub ttyrecs_filter_between {
   my ($game_start, $end, @ttyrecs) = @_;
 
@@ -379,7 +291,7 @@ sub game_turn_based_seek {
 }
 
 sub fetch_ttyrecs {
-  my ($g, $no_death_check) = @_;
+  my ($listener, $g, $no_death_check) = @_;
   my $start = tty_time($g, 'start');
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
 
@@ -392,22 +304,7 @@ sub fetch_ttyrecs {
 
   my @ttyrecs;
 
-  # If we have only an end time, look for an existing ttyrec that
-  # covers this time.
-  if (!$start && $end) {
-    my $ttyrec = find_existing_ttyrec($g, $end);
-    if ($ttyrec) {
-      push @ttyrecs, $ttyrec;
-
-      # Early exit.
-      $g->{ttyrecs} = $ttyrec;
-      $g->{ttyrecurls} = \@ttyrecs;
-      $g->{sz} = -s(ttyrec_path($g, $ttyrec));
-      return $g;
-    }
-  }
-
-  @ttyrecs = find_ttyrecs_for_game_player($g) or do {
+  @ttyrecs = find_ttyrecs_for_game_player($listener, $g) or do {
     print "No ttyrecs on server for ", desc_game($g), "?\n";
     return;
   };
@@ -426,35 +323,42 @@ sub fetch_ttyrecs {
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @filtered_ttyrecs));
   $g->{ttyrecurls} = \@filtered_ttyrecs;
-  download_ttyrecs($g, $no_death_check, $turn_seek)
+  download_ttyrecs($listener, $g, $no_death_check, $turn_seek)
 }
 
 sub fetch_ttyrec_urls_from_server {
-  my ($name, $userpath, $time_wanted) = @_;
+  my ($listener, $name, $userpath, $time_wanted) = @_;
 
   my $now = time();
   my $cache = $CACHED_TTYREC_URLS{$userpath};
   return @{$cache->[1]} if $cache && $cache->[0] >= $time_wanted;
 
-  notify_fetch_listeners("Fetching ttyrec listing from " . $userpath . "...");
+  notify_fetch_listener($listener,
+                        "Fetching ttyrec listing from " . $userpath . "...");
 
   my $rttyrecs = CSplat::TtyrecList::fetch_listing($name, $userpath);
   $rttyrecs = [] unless defined $rttyrecs;
 
-  $CACHED_TTYREC_URLS{$userpath} = [ $now, $rttyrecs ];
+  if (length(keys %CACHED_TTYREC_URLS) > $CACHE_MAX) {
+    %CACHED_TTYREC_URLS = ();
+  }
+
+  $CACHED_TTYREC_URLS{$userpath} = shared_clone([ $now, $rttyrecs ]);
   @$rttyrecs
 }
 
 sub fetch_ttyrec_urls_from_multiple_servers {
-  my ($name, $ruserpaths, $time_wanted) = @_;
+  my ($listener, $name, $ruserpaths, $time_wanted) = @_;
 
   if (@$ruserpaths == 1) {
-    return fetch_ttyrec_urls_from_server($name, $$ruserpaths[0], $time_wanted);
+    return fetch_ttyrec_urls_from_server($listener, $name, $$ruserpaths[0],
+                                         $time_wanted);
   }
 
   my %merged_list;
   for my $server_user_url (@$ruserpaths) {
-    my @ttyrecs = fetch_ttyrec_urls_from_server($name, $server_user_url,
+    my @ttyrecs = fetch_ttyrec_urls_from_server($listener,
+                                                $name, $server_user_url,
                                                 $time_wanted);
     $merged_list{$_->{timestr}} = $_ for @ttyrecs;
   }
@@ -471,12 +375,12 @@ sub find_game_ttyrec_list_path {
 }
 
 sub find_ttyrecs_for_game_player {
-  my $g = shift;
+  my ($listener, $g) = @_;
 
   my @ttyrecurls = find_game_ttyrec_list_path($g);
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
   my $time = int(UnixDate($end, "%s"));
-  my @urls = fetch_ttyrec_urls_from_multiple_servers($g->{name},
+  my @urls = fetch_ttyrec_urls_from_multiple_servers($listener, $g->{name},
                                                      \@ttyrecurls, $time);
   @urls
 }
@@ -557,7 +461,12 @@ sub fetch_request {
                                      Timeout => 15);
     unless ($sock) {
       # The fetch server doesn't seem to be running, try starting it.
-      system "perl fetch.pl";
+      my $pid = fork;
+      unless ($pid) {
+        print "Starting fetch server\n";
+        exec "perl -MCarp=verbose fetch.pl";
+        exit 0;
+      }
       # Give it a little time to get moving.
       sleep 1;
     }

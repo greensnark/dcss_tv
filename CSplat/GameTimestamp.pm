@@ -119,8 +119,9 @@ sub fetch_timestamp_file {
       CSplat::Fetch::fetch_url($url, $self->{file});
     };
     return unless $@;
+    warn "Error fetching timestamp file from $url: $@\n";
   }
-  die "Could not fetch timestamp file for game\n";
+  die "Could not fetch timestamp file for game from any of @urls\n";
 }
 
 1

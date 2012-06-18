@@ -14,6 +14,8 @@ our @EXPORT_OK = qw/%PLAYED_GAMES exec_query exec_do exec_all
                     tty_precalculated_frame_offset tty_save_frame_offset
                     tty_delete_frame_offset last_row_id check_dirs/;
 
+use Carp;
+
 use CSplat::Xlog qw/xlog_hash/;
 use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
 use File::Path;
@@ -56,6 +58,7 @@ sub check_exec {
 
 sub exec_query {
   my ($query, @pars) = @_;
+  confess "No db available" unless $DBH;
   my $st = $DBH->prepare($query) or die "Can't prepare $query: $!\n";
   check_exec( $query, sub { $st->execute(@pars) } );
   $st

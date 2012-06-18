@@ -5,16 +5,17 @@
 use strict;
 use warnings;
 
+use threads;
+use threads::shared;
+
 use Fcntl qw/LOCK_EX/;
 use IO::Socket::INET;
 use IO::Handle;
 
 use CSplat::Config qw/$FETCH_PORT/;
-use CSplat::Ttyrec qw/update_fetched_games clear_cached_urls fetch_ttyrecs
-                      record_game/;
+use CSplat::Ttyrec qw/clear_cached_urls fetch_ttyrecs/;
 use CSplat::Seek qw/tty_frame_offset/;
 use CSplat::Select qw/interesting_game/;
-use CSplat::DB qw/open_db/;
 use CSplat::Xlog qw/xlog_hash xlog_str desc_game/;
 
 use POSIX;
@@ -34,13 +35,13 @@ run_fetch();
 sub daemonize {
   print "Starting fetch server\n";
 
-  my $pid = fork;
-  exit if $pid;
-  die "Failed to fork: $!\n" unless defined $pid;
+  #my $pid = fork;
+  #exit if $pid;
+  #die "Failed to fork: $!\n" unless defined $pid;
 
   # [ds] Stay in the same session so that the fetch daemon is killed when the
   # parent process is killed.
-  setsid;
+  #setsid;
   open my $logf, '>', $LOG_FILE or die "Can't write $LOG_FILE: $!\n";
   $logf->autoflush;
   open STDOUT, '>&', $logf or die "Couldn't redirect stdout\n";
@@ -67,19 +68,8 @@ sub acquire_lock {
   die $failmsg if $@ eq "alarm\n";
 }
 
-sub sync_games {
-  my $now = time();
-  if (!$lastsync || $now - $lastsync > 5) {
-    update_fetched_games();
-    $lastsync = $now;
-  }
-}
-
 sub run_fetch {
   print "Starting fetch service\n";
-  open_db();
-  sync_games();
-
   my $server = IO::Socket::INET->new(LocalPort => $FETCH_PORT,
                                      Type => SOCK_STREAM,
                                      Reuse => 1,
@@ -87,11 +77,13 @@ sub run_fetch {
     or die "Couldn't open server socket on $FETCH_PORT: $@\n";
 
   while (my $client = $server->accept()) {
-    sync_games();
-    eval {
-      process_command($client);
-    };
-    warn "$@" if $@;
+    my $thread = threads->new(sub {
+      eval {
+        process_command($client);
+      };
+      warn "$@" if $@;
+    });
+    $thread->detach;
   }
 }
 
@@ -146,8 +138,9 @@ sub fetch_game {
 
   print "Requested download: $g\n";
 
-  CSplat::Ttyrec::clear_fetch_listeners();
-  CSplat::Ttyrec::add_fetch_listener(sub { fetch_notifier($client, $g, @_) });
+  my $listener = sub {
+    fetch_notifier($client, $g, @_);
+  };
 
   $g = xlog_hash($g);
 
@@ -155,7 +148,7 @@ sub fetch_game {
   my $nocheck = $g->{nocheck};
   delete $g->{nocheck};
   delete @$g{qw/start nostart/} if $g->{nostart};
-  my $result = fetch_ttyrecs($g, $nocheck);
+  my $result = fetch_ttyrecs($listener, $g, $nocheck);
   $g->{start} = $start;
   if ($result) {
     my $dejafait = $g->{id};
@@ -165,8 +158,6 @@ sub fetch_game {
     else {
       print "Downloaded ttyrecs for ", desc_game($g), " ($g->{ttyrecs})\n";
     }
-    # If the game already has an id, it's already been registered
-    record_game($g, CSplat::Select::game_splattiness($g)) unless $dejafait;
 
     if ($@) {
       warn $@;
@@ -180,5 +171,4 @@ sub fetch_game {
     print "Failed to download ", desc_game($g), "\n";
     die "Failed to download game\n";
   }
-  CSplat::Ttyrec::clear_fetch_listeners();
 }
