@@ -84,10 +84,16 @@ sub timestamp {
   $self->{timestamp} ||= CSplat::GameTimestamp->new($self->{g})
 }
 
+sub timestamp_for_turn {
+  my ($self, $turn) = @_;
+  return $self->{start_time} if $turn == 0 || $turn == 1 && $self->{start_time};
+  $self->timestamp()->timestamp_for_turn($turn)
+}
+
 sub start_time {
   my $self = shift;
   my $start = $self->start_turn();
-  $start && $self->timestamp()->timestamp_for_turn($start) ||
+  $start && $self->timestamp_for_turn($start) ||
     $self->{milestone_start_time}
 }
 
@@ -100,8 +106,7 @@ sub hard_start_time {
 sub end_time {
   my $self = shift;
   my $end = $self->end_turn();
-  ($end && $self->timestamp()->timestamp_for_turn($end)) ||
-    $self->default_end_time()
+  ($end && $self->timestamp_for_turn($end)) || $self->default_end_time()
 }
 
 1
