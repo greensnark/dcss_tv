@@ -127,12 +127,32 @@ sub is_death_frame {
   $frame =~ /You die\.\.\./;
 }
 
+sub min {
+  my ($a, $b) = @_;
+  $a > $b ? $a : $b
+}
+
+sub frame_delay_provider {
+  my $g = shift;
+  my $idle_clamp = $$g{idle_clamp} || 4;
+  my $speed_up = $$g{playback_speed} || 1;
+  $speed_up = 10 if $speed_up > 10;
+  $speed_up = 0.1 if $speed_up < 0.1;
+  return sub {
+    my $wait = shift;
+    $wait /= $speed_up;
+    $wait = $idle_clamp if $wait > $idle_clamp;
+    $wait
+  };
+}
+
 sub play_ttyrec {
   my ($self, $g, $ttyfile, $offset, $stop_offset, $frame) = @_;
 
   $self->write($frame) if $frame;
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
+  my $frame_delay = frame_delay_provider($g);
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
                                   time_threshold => 3);
   seek($t->filehandle(), $offset, SEEK_SET) if $offset;
@@ -141,7 +161,10 @@ sub play_ttyrec {
 
  PLAYBACK:
   while (my $fref = $t->next_frame()) {
-    select undef, undef, undef, $fref->{diff};
+    my $delay = $frame_delay->($fref->{diff});
+    if ($delay > 0) {
+      select undef, undef, undef, $delay;
+    }
     $self->write(tv_frame_strip($fref->{data}));
     select undef, undef, undef, 1 if is_death_frame($fref->{data});
 

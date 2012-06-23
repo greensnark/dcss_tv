@@ -27,7 +27,7 @@ my @queued_playback : shared;
 my @stop_list : shared;
 
 my @recently_played;
-my $DUPE_SUPPRESSION_THRESHOLD = 5;
+my $DUPE_SUPPRESSION_THRESHOLD = 9;
 
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'local-request',
@@ -92,6 +92,8 @@ sub dedupe_auto_footv_game {
   my $game = shift;
   my $g = canonicalize_game(xlog_hash($game));
   my $game_key = game_key($g);
+  print "Considering game $game_key (recent: ", join(", ", @recently_played), "): ",
+    desc_game($g), "\n";
   return undef if (grep($_ eq $game_key, @recently_played));
   push @recently_played, $game_key;
   if (@recently_played > $DUPE_SUPPRESSION_THRESHOLD) {
