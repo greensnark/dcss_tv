@@ -437,6 +437,7 @@ sub tv_frame_strip {
   $rdat =~ s/\xe2\x96\x92/#/g;
   $rdat =~ s/\xe2\x96\x91/*/g;
   $rdat =~ s/\xc2\xb7/./g;
+  $rdat =~ s/\xe2\x88\x99/./g;
   $rdat =~ s/\xe2\x97\xa6/,/g;
   $rdat =~ s/\xe2\x97\xbc/+/g;
   $rdat =~ s/\xe2\x88\xa9/\\/g;
