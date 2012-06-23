@@ -139,6 +139,7 @@ sub tty_calc_frame_offset {
   }
 
   my $explicit_start_time = $turn_seek && $turn_seek->start_time();
+  print "Explicit start time: $explicit_start_time\n";
   if ($explicit_start_time) {
     $start_ttyrec = $ttyrecs[0];
     my ($start, $end, $seek_frame_offset) =
@@ -154,6 +155,7 @@ sub tty_calc_frame_offset {
   my $size_before_playback_frame = 0;
   for my $ttyrec (@ttyrecs) {
     my $ttyrec_size = -s(ttyrec_path($g, $ttyrec));
+    print "ttyrec: $ttyrec, start: $start_ttyrec, size_before_frame: $size_before_playback_frame, tty size: $ttyrec_size\n";
     if ($ttyrec eq $start_ttyrec) {
       $size_before_playback_frame += $start_offset;
       last;
@@ -184,6 +186,7 @@ sub tty_calc_frame_offset {
 
   for my $ttyrec (@ttyrecs) {
     my $ttyrec_size = -s(ttyrec_path($g, $ttyrec));
+    print "Considering $ttyrec, size: $ttyrec_size, skip size: $playback_skip_size\n";
     if ($playback_skip_size >= $ttyrec_size) {
       $playback_skip_size -= $ttyrec_size;
       $size_before_playback_frame -= $ttyrec_size;
@@ -208,6 +211,7 @@ sub tty_calc_frame_offset {
         $stop_offset = $end_offset + $endpad;
       }
     }
+    print "Play range: start: $ttr, offset: $offset, end: $end_ttyrec, end_offset: $stop_offset\n";
     return CSplat::TtyPlayRange->new(start_file => $ttr,
                                      start_offset => $offset,
                                      end_file => $end_ttyrec,

@@ -216,8 +216,9 @@ sub ttyrec_play_time {
   my ($g, $ttyrec, $seektime) = @_;
 
   my $file = ttyrec_path($g, $ttyrec);
-
   my $start = ttyrec_file_time($ttyrec);
+  return ($start, $start, 0) if $seektime le $start;
+
   my $t = Term::TtyRec::Plus->new(infile => $file);
 
   my $last_ts;
