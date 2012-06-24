@@ -4,7 +4,7 @@ use warnings;
 package CSplat::Xlog;
 
 use base 'Exporter';
-our @EXPORT_OK = qw/xlog_hash desc_game desc_game_brief
+our @EXPORT_OK = qw/xlog_hash desc_game desc_game_brief game_title
                     fix_crawl_time game_unique_key xlog_str
                     xlog_merge/;
 
@@ -90,8 +90,13 @@ sub pad_god {
   pad($len, $text)
 }
 
-sub desc_game_brief {
+sub game_title {
   my $g = shift;
+  desc_game_brief($g, 'title')
+}
+
+sub desc_game_brief {
+  my ($g, $title) = @_;
   my $xl = "$$g{xl}";
   # Name, Title, XL, God, place, tmsg.
   my @pieces = ($$g{name},
@@ -103,7 +108,7 @@ sub desc_game_brief {
   }
   @pieces = grep($_, @pieces);
   my $text = join(", ", @pieces);
-  if ($g->{req}) {
+  if (!$title && $g->{req}) {
     $text .= " (r:$g->{req})";
   }
 

@@ -10,7 +10,7 @@ our @EXPORT_OK;
 
 use CSplat::Ttyrec qw/tv_frame_strip ttyrec_path/;
 use CSplat::Seek qw/tty_frame_offset/;
-use CSplat::Xlog qw/desc_game desc_game_brief/;
+use CSplat::Xlog qw/desc_game desc_game_brief game_title/;
 use IO::Handle;
 use IO::Socket::INET;
 use Carp;
@@ -154,7 +154,7 @@ sub frame_delay_provider {
 sub play_ttyrec {
   my ($self, $g, $ttyfile, $offset, $stop_offset, $frame) = @_;
 
-  $self->title(desc_game_brief($g));
+  $self->title(game_title($g));
   $self->write($frame) if $frame;
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 

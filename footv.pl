@@ -5,7 +5,7 @@ use warnings;
 
 use Getopt::Long;
 use CSplat::DB qw/open_db/;
-use CSplat::Xlog qw/desc_game desc_game_brief xlog_hash xlog_str/;
+use CSplat::Xlog qw/desc_game desc_game_brief game_title xlog_hash xlog_str/;
 use CSplat::Ttyrec qw/request_download/;
 use CSplat::Select qw/filter_matches make_filter/;
 use CSplat::Termcast;
@@ -119,7 +119,6 @@ sub queue_games_automatically {
 
       my $nondupe_game = dedupe_auto_footv_game($game);
       if ($nondupe_game) {
-        $$nondupe_game{req} = $TERMCAST_CHANNEL;
         fetch_game_for_playback($nondupe_game);
       }
     }
@@ -209,7 +208,7 @@ sub tv_show_playlist {
                desc_game_brief($game));
     if ($first) {
       $TV->write("\e[0m");
-      $TV->title(desc_game_brief($game));
+      $TV->title(game_title($game));
     }
     undef $first;
     ++$pos;
@@ -257,7 +256,7 @@ sub update_status {
     } else {
       $TV->write("\e[1;34mRequest by $$f{req}:\e[0m\r\n",
                  desc_game_brief($f), "\r\n");
-      $TV->title(desc_game_brief($f));
+      $TV->title(game_title($f));
       $TV->write("\r\nPlease wait, fetching game...\r\n");
       undef $$rlmsg;
     }
