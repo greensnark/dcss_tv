@@ -187,6 +187,10 @@ sub tv_show_playlist {
   my ($TV, $rplay, $prev) = @_;
 
   $TV->clear();
+  if (@$rplay) {
+    $TV->title(game_title($$rplay[0]));
+  }
+
   if ($prev) {
     $prev = desc_game_brief($prev);
     $TV->write("\e[1H\e[1;37mLast game played:\e[0m\e[2H\e[1;33m$prev.\e[0m");
@@ -208,7 +212,6 @@ sub tv_show_playlist {
                desc_game_brief($game));
     if ($first) {
       $TV->write("\e[0m");
-      $TV->title(game_title($game));
     }
     undef $first;
     ++$pos;
