@@ -108,6 +108,11 @@ sub reconnect {
   }
 }
 
+sub title {
+  my $self = shift;
+  $self->write("\e]2;" . join("", @_) . "\007")
+}
+
 sub write {
   my $self = shift;
   $self->connect();
@@ -149,6 +154,7 @@ sub frame_delay_provider {
 sub play_ttyrec {
   my ($self, $g, $ttyfile, $offset, $stop_offset, $frame) = @_;
 
+  $self->title(desc_game_brief($g));
   $self->write($frame) if $frame;
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 

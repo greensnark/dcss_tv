@@ -207,7 +207,10 @@ sub tv_show_playlist {
     $TV->write("\e[$pos;1H",
                $first? "\e[1;34m" : "\e[0m",
                desc_game_brief($game));
-    $TV->write("\e[0m") if $first;
+    if ($first) {
+      $TV->write("\e[0m");
+      $TV->title(desc_game_brief($game));
+    }
     undef $first;
     ++$pos;
   }
@@ -254,6 +257,7 @@ sub update_status {
     } else {
       $TV->write("\e[1;34mRequest by $$f{req}:\e[0m\r\n",
                  desc_game_brief($f), "\r\n");
+      $TV->title(desc_game_brief($f));
       $TV->write("\r\nPlease wait, fetching game...\r\n");
       undef $$rlmsg;
     }
@@ -301,6 +305,11 @@ sub channel_password_file {
   }
 }
 
+sub flag_idle {
+  my $TV = shift;
+  $TV->title("[waiting]");
+}
+
 sub request_tv {
   print("Connecting to TV: name: $TERMCAST_CHANNEL, passfile: ", channel_password_file(), "\n");
   my $TV = CSplat::Termcast->new(name => $TERMCAST_CHANNEL,
@@ -323,6 +332,7 @@ sub request_tv {
  RELOOP:
   while (1) {
     $TV->clear();
+    flag_idle($TV);
     $TV->write("\e[1H");
     if ($last_game) {
       $TV->clear();

@@ -93,21 +93,21 @@ sub pad_god {
 sub desc_game_brief {
   my $g = shift;
   my $xl = "$$g{xl}";
-  $xl = " $xl" if length($xl) == 1;
   # Name, Title, XL, God, place, tmsg.
-  my @pieces = (pad(20, $$g{name}),
+  my @pieces = ($$g{name},
                 "L$xl $$g{char}",
-                pad_god(12, $$g{god}),
-                pad(8, $$g{place}));
-  @pieces = grep($_, @pieces);
-  my $text = join("  ", @pieces);
-  $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
-
-  if ($g->{req}) {
-    my $suffix = " (r:$g->{req})";
-    my $rlen = length($suffix);
-    $text = pad($MAX_WIDTH - $rlen, $text) . $suffix
+                $$g{god},
+                $$g{place} !~ /\$$/ && $$g{place});
+  if ($$g{extra}) {
+    push @pieces, grep($_, map($$g{$_} && "$_:$$g{$_}", split /,/, $$g{extra}));
   }
+  @pieces = grep($_, @pieces);
+  my $text = join(", ", @pieces);
+  if ($g->{req}) {
+    $text .= " (r:$g->{req})";
+  }
+
+  $text = substr($text, 0, $MAX_WIDTH) if length($text) > $MAX_WIDTH;
   $text
 }
 
