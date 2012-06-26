@@ -70,12 +70,17 @@ sub connect {
     $self->{SOCK}->autoflush;
   }
 
+  my $wait = 3;
   while (!defined($self->{SOCK})) {
     $self->reconnect();
     last if defined($self->{SOCK});
     print "Unable to connect to $self->{host}:$self->{port}, ",
-      "retrying in 10s...\n";
-    sleep 10;
+      "retrying in ${wait}s...\n";
+    sleep $wait;
+  }
+
+  if ($self->{title}) {
+    $self->title($self->{title});
   }
 }
 
@@ -110,15 +115,27 @@ sub reconnect {
 
 sub title {
   my $self = shift;
-  $self->write("\e]2;" . join("", @_) . "\007")
+  $self->{title} = join("", @_);
+  $self->write("\e]2;" . $self->{title} . "\007")
 }
 
 sub write {
   my $self = shift;
+
+  my $errored;
+  local $SIG{PIPE} = sub {
+    $errored = 1;
+  };
   $self->connect();
   my $SOCK = $self->{SOCK};
   for my $text (@_) {
     print $SOCK $text;
+  }
+
+  if ($errored) {
+    print "Connection to termcast dropped, retrying...\n";
+    delete $self->{SOCK};
+    $self->write(@_);
   }
 }
 
