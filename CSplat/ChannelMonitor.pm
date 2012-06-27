@@ -77,6 +77,9 @@ sub launch_channel {
 sub update_channels {
   my $self = shift;
   my $channels = $self->query_channels;
+  # Ignore temporary failures to reach the channel def server.
+  return unless defined $channels;
+
   for my $channel (keys %$channels) {
     next unless $self->valid_channel_name($channel);
     my $channel_def = $$channels{$channel};

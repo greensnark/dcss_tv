@@ -24,6 +24,7 @@ sub game_query_url {
 sub query_channels {
   my %channels;
   my $channel_listing = get(channel_query_url());
+  return undef unless defined $channel_listing;
   if ($channel_listing) {
     for my $line (split /\n/, $channel_listing) {
       if ($line =~ /^(\S+) (.*)/) {
