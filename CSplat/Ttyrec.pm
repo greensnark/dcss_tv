@@ -11,6 +11,7 @@ use base 'Exporter';
 
 our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     clear_cached_urls ttyrec_path url_file
+                    game_ttyrec_directory
                     ttyrec_file_time fetch_ttyrecs
                     tv_frame_strip is_death_ttyrec
                     ttyrecs_out_of_time_bounds request_download
@@ -25,6 +26,7 @@ use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use CSplat::Fetch qw/fetch_url/;
 use CSplat::TtyTime qw/tty_time/;
 use CSplat::TtyrecList;
+use CSplat::TtyrecDir;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
@@ -324,7 +326,12 @@ sub fetch_ttyrecs {
 
   $g->{ttyrecs} = join(" ", map($_->{u}, @filtered_ttyrecs));
   $g->{ttyrecurls} = \@filtered_ttyrecs;
-  download_ttyrecs($listener, $g, $no_death_check, $turn_seek)
+
+  CSplat::TtyrecDir->lock_for_download(
+    ttyrec_directory($g, $filtered_ttyrecs[0]{u}),
+    sub {
+      download_ttyrecs($listener, $g, $no_death_check, $turn_seek)
+    })
 }
 
 sub fetch_ttyrec_urls_from_server {
@@ -407,12 +414,24 @@ sub ttyrec_between {
   ($pdate le $end) && (!$start || $pdate ge $start)
 }
 
-sub ttyrec_path {
+sub ttyrec_directory {
   my ($g, $url) = @_;
   my $server = game_server($g);
   my $dir = "$TTYREC_DIR/$server/$g->{name}";
   mkpath( [ $dir ] ) unless -d $dir;
+  $dir
+}
+
+sub ttyrec_path {
+  my ($g, $url) = @_;
+  my $dir = ttyrec_directory($g, $url);
   $dir . "/" . url_file($url)
+}
+
+sub game_ttyrec_directory {
+  my $g = shift;
+  my @ttyrecs = split / /, $g->{ttyrecs};
+  ttyrec_directory($g, $ttyrecs[0])
 }
 
 sub _strip_dec {

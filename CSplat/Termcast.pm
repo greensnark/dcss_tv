@@ -8,7 +8,7 @@ use lib '..';
 
 our @EXPORT_OK;
 
-use CSplat::Ttyrec qw/tv_frame_strip ttyrec_path/;
+use CSplat::Ttyrec qw/tv_frame_strip ttyrec_path game_ttyrec_directory/;
 use CSplat::Seek qw/tty_frame_offset/;
 use CSplat::Xlog qw/desc_game desc_game_brief game_title/;
 use IO::Handle;
@@ -212,6 +212,14 @@ sub play_ttyrec {
 }
 
 sub play_game {
+  my ($self, $g) = @_;
+  CSplat::TtyrecDir->lock_for_read(game_ttyrec_directory($g),
+                                   sub {
+                                     $self->play_game_ttyrecs($g)
+                                   });
+}
+
+sub play_game_ttyrecs {
   my ($self, $g) = @_;
 
   my $playback_range =

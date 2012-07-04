@@ -13,3 +13,4 @@ TAGS
 _flymake*
 *.ts
 channels
+.*

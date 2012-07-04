@@ -12,6 +12,7 @@ use Fcntl qw/LOCK_EX/;
 use IO::Socket::INET;
 use IO::Handle;
 
+use CSplat::Util qw/run_service/;
 use CSplat::Config qw/$FETCH_PORT/;
 use CSplat::Ttyrec qw/clear_cached_urls fetch_ttyrecs/;
 use CSplat::Seek qw/tty_frame_offset/;
@@ -19,10 +20,6 @@ use CSplat::Select qw/interesting_game/;
 use CSplat::Xlog qw/xlog_hash xlog_str desc_game/;
 
 use POSIX;
-
-my $LOCK_FILE = '.fetch.lock';
-my $LOG_FILE = '.fetch.log';
-my $LOCK_HANDLE;
 
 my $MAX_REQUEST_COUNT = 279;
 
@@ -32,66 +29,21 @@ my $lastsync;
 
 local $| = 1;
 
-acquire_lock();
-daemonize();
-run_fetch();
+main();
 
-sub daemonize {
-  print "Starting fetch server\n";
-
-  #my $pid = fork;
-  #exit if $pid;
-  #die "Failed to fork: $!\n" unless defined $pid;
-
-  # [ds] Stay in the same session so that the fetch daemon is killed when the
-  # parent process is killed.
-  #setsid;
-  open my $logf, '>', $LOG_FILE or die "Can't write $LOG_FILE: $!\n";
-  $logf->autoflush;
-  open STDOUT, '>&', $logf or die "Couldn't redirect stdout\n";
-  open STDERR, '>&', $logf or die "Couldn't redirect stderr\n";
-  STDOUT->autoflush;
-  STDERR->autoflush;
+sub main {
+  run_autovacuum();
+  run_service('fetch', \&run_fetch);
 }
 
-sub alarm_timeout {
-  my ($timeout, $timeout_msg, $sub) = @_;
-
-  my $alarm_exc = "alarm\n";
-  local $SIG{ALRM} =
-    sub {
-      die $alarm_exc;
-    };
-  alarm $timeout;
-  eval {
-    $sub->();
-  };
-
-  my $error = $@;
-  alarm 0;
-  if ($error) {
-    if ($error eq $alarm_exc) {
-      die $timeout_msg;
-    }
-    die $error;
-  }
-}
-
-sub acquire_lock {
-  my $failmsg =
-    "Failed to lock $LOCK_FILE: another fetch daemon may be running\n";
-  alarm_timeout(3, $failmsg,
-          sub {
-            print "Trying to lock $LOCK_FILE\n";
-            open $LOCK_HANDLE, '>', $LOCK_FILE or
-              die "Couldn't open $LOCK_FILE: $!\n";
-            flock $LOCK_HANDLE, LOCK_EX or die $failmsg;
-            print "Locked $LOCK_FILE\n";
-          });
+sub run_autovacuum {
+  my $pid = fork;
+  return if $pid;
+  exec("perl vacuum.pl");
+  exit 0;
 }
 
 sub run_fetch {
-  print "Starting fetch service\n";
   my $server = IO::Socket::INET->new(LocalPort => $FETCH_PORT,
                                      Type => SOCK_STREAM,
                                      Reuse => 1,
