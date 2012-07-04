@@ -24,6 +24,10 @@ my $LOCK_FILE = '.fetch.lock';
 my $LOG_FILE = '.fetch.log';
 my $LOCK_HANDLE;
 
+my $MAX_REQUEST_COUNT = 279;
+
+my $live_thread_count :shared = 0;
+
 my $lastsync;
 
 local $| = 1;
@@ -50,22 +54,40 @@ sub daemonize {
   STDERR->autoflush;
 }
 
+sub alarm_timeout {
+  my ($timeout, $timeout_msg, $sub) = @_;
+
+  my $alarm_exc = "alarm\n";
+  local $SIG{ALRM} =
+    sub {
+      die $alarm_exc;
+    };
+  alarm $timeout;
+  eval {
+    $sub->();
+  };
+
+  my $error = $@;
+  alarm 0;
+  if ($error) {
+    if ($error eq $alarm_exc) {
+      die $timeout_msg;
+    }
+    die $error;
+  }
+}
+
 sub acquire_lock {
   my $failmsg =
     "Failed to lock $LOCK_FILE: another fetch daemon may be running\n";
-  eval {
-    # local $SIG{ALRM} =
-    #   sub {
-    #     die "alarm\n";
-    #   };
-    # alarm 3;
-
-    print "Trying to lock $LOCK_FILE\n";
-    open $LOCK_HANDLE, '>', $LOCK_FILE or die "Couldn't open $LOCK_FILE: $!\n";
-    flock $LOCK_HANDLE, LOCK_EX or die $failmsg;
-    print "Locked $LOCK_FILE\n";
-  };
-  die $failmsg if $@ eq "alarm\n";
+  alarm_timeout(3, $failmsg,
+          sub {
+            print "Trying to lock $LOCK_FILE\n";
+            open $LOCK_HANDLE, '>', $LOCK_FILE or
+              die "Couldn't open $LOCK_FILE: $!\n";
+            flock $LOCK_HANDLE, LOCK_EX or die $failmsg;
+            print "Locked $LOCK_FILE\n";
+          });
 }
 
 sub run_fetch {
@@ -76,15 +98,30 @@ sub run_fetch {
                                      Listen => 5)
     or die "Couldn't open server socket on $FETCH_PORT: $@\n";
 
-  while (my $client = $server->accept()) {
+  # Since the shared thread variables seem to leak, set a max request count.
+  my $max_requests = $MAX_REQUEST_COUNT;
+  while ((my $client = $server->accept()) && $max_requests-- > 0) {
+    ++$live_thread_count;
     my $thread = threads->new(sub {
       eval {
         process_command($client);
       };
+      --$live_thread_count if $live_thread_count > 0;
       warn "$@" if $@;
     });
     $thread->detach;
   }
+  if ($max_requests < 0) {
+    print "Fulfilled $MAX_REQUEST_COUNT requests, exiting\n";
+  }
+
+  $server->close();
+
+  while ($live_thread_count > 0) {
+    sleep 2;
+    print "Waiting for fetch threads to exit\n";
+  }
+  print "All threads completed, shutting down.\n";
 }
 
 sub process_command {
