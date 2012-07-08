@@ -12,6 +12,7 @@ use CSplat::Termcast;
 use CSplat::Request;
 use CSplat::ChannelMonitor;
 use CSplat::Channel;
+use TV::ChannelQuery;
 use Term::TtyRec::Plus;
 use IO::Socket::INET;
 use Date::Manip;
@@ -103,15 +104,23 @@ sub dedupe_auto_footv_game {
 }
 
 sub queue_games_automatically {
+  my $channel_def;
+  my $query;
   while (1) {
     if (!CSplat::Channel::channel_exists($TERMCAST_CHANNEL)) {
       terminate_auto_footv();
     }
 
     my $def = CSplat::Channel::channel_def($TERMCAST_CHANNEL);
+    if (!$channel_def || $def ne $channel_def) {
+      $channel_def = $def;
+      print "Channel definition: $TERMCAST_CHANNEL => $channel_def\n";
+      $query = TV::ChannelQuery->new($channel_def);
+    }
+
     my $list_attempts = 30;
     while (@queued_playback < 5 && $list_attempts-- > 0) {
-      my $game = CSplat::ChannelServer::query_game($def);
+      my $game = $query->next_game();
       unless ($game) {
         print "Channel server provided no game for $def, will retry later\n";
         last;

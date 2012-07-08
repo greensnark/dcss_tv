@@ -30,11 +30,20 @@ sub channel_def {
   open my $inf, '<', $file or die "Can't open $file: $!\n";
   chomp(my $def = do { local $/; <$inf> });
 
-  unless ($def =~ /-tv/) {
-    $def = "$def -tv";
+  my @queries = split /;;/, $def;
+  for my $query (@queries) {
+    $query =~ s/^\s+|\s+$//g;
+    if ($query =~ /^\?\?/) {
+      $query =~ s/\[\S+?\]$//;
+      $query .= "[any]";
+    } else {
+      if ($query !~ /-tv/) {
+        $query .= " -tv";
+      }
+      $query .=" -random";
+    }
   }
-  $def = "$def -random";
-  $def
+  join(" ;; ", @queries)
 }
 
 sub channel_exists {
