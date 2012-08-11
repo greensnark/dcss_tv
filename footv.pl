@@ -387,7 +387,7 @@ sub request_tv {
       };
       if ($@) {
         $TV->write("\e[1;31mPlayback failed for: \e[0m\r\n",
-                   desc_game_brief($f), ": $@\r\n");
+                   desc_game_brief($g), ": $@\r\n");
       }
       $last_game = $g;
     }
