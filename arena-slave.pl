@@ -132,8 +132,8 @@ sub announce_arena {
 }
 
 sub arena_tv {
-  announce_arena();
   while (1) {
+    announce_arena();
     sleep 1;
     next unless @queued_fights || @queued_cancels;
     handle_cancels();
@@ -146,7 +146,6 @@ sub arena_tv {
     sleep 4 unless @bad_requests;
 
     $TV->reset();
-    announce_arena();
   }
 }
 

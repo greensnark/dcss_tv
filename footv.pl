@@ -382,7 +382,13 @@ sub request_tv {
     if ($line) {
       my $g = xlog_hash($line);
       warn "Playing ttyrec for ", desc_game($g), " for $TERMCAST_CHANNEL\n";
-      $TV->play_game($g);
+      eval {
+        $TV->play_game($g);
+      };
+      if ($@) {
+        $TV->write("\e[1;31mPlayback failed for: \e[0m\r\n",
+                   desc_game_brief($f), ": $@\r\n");
+      }
       $last_game = $g;
     }
   }
