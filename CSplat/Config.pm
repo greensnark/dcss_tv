@@ -60,13 +60,20 @@ our %SERVMAP =
      tz => 'UTC', dsttz => 'UTC',
      ttypath => ['http://light.bitprayer.com/userdata/$player$/ttyrec'],
      timestamp_path => ['http://light.bitprayer.com/userdata/$player$/morgue']
-   }
+   },
+   'crawl.s-z.org' => {
+     http_fetch_only => 1,
+     tz => 'EST', dsttz => 'EDT',
+     ttypath => ['http://dobrazupa.org/ttyrec/$player$'],
+     timestamp_path => ['http://dobrazupa.org/morgue/$player$']
+   },
 );
 
-our %SERVABBREV = (cao => 'http://crawl.akrasiac.org/',
-                   cdo => 'http://crawl.develz.org/',
-                   rhf => 'http://rl.heh.fi/',
-                   lbc => 'http://light.bitprayer.com/');
+our %SERVABBREV = (cao  => 'http://crawl.akrasiac.org/',
+                   cdo  => 'http://crawl.develz.org/',
+                   rhf  => 'http://rl.heh.fi/',
+                   lbc  => 'http://light.bitprayer.com/',
+                   cszo => 'http://crawl.s-z.org/');
 
 sub game_server {
   my $g = shift;
