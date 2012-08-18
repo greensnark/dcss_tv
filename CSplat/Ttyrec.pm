@@ -271,6 +271,16 @@ sub ttyrec_play_time {
   ($start, $end, $seek_frame_offset)
 }
 
+sub delta_seconds {
+  my $delta = shift;
+  return Delta_Format($delta, '%sh');
+}
+
+sub time_delta_seconds {
+  my ($candidate_time, $reference_time) = @_;
+  delta_seconds(DateCalc($candidate_time, $reference_time))
+}
+
 sub ttyrecs_filter_between {
   my ($game_start, $end, @ttyrecs) = @_;
 
@@ -279,12 +289,19 @@ sub ttyrecs_filter_between {
   # Crawl starts. To work around this, we resolve the game start time to
   # the ttyrec start time that is closest to the start time and <= to it.
 
-  my $start;
+  # Ttyrec must be within this time before game start (1hr) to be
+  # considered a part of the game.
+  my $oldest_ttyrec_before_start = 3600;
+
+  my $start = $game_start;
   if ($game_start) {
     for my $ttyrec (reverse @ttyrecs) {
       my $time = ttyrec_file_time($$ttyrec{u});
       if ($time le $game_start) {
-        $start = $time;
+        if (time_delta_seconds($time, $game_start) <
+            $oldest_ttyrec_before_start) {
+          $start = $time;
+        }
         last;
       }
     }

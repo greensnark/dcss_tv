@@ -7,6 +7,7 @@ use base 'Exporter';
 use LWP::Simple;
 use IO::Socket::INET;
 use CSplat::Config;
+use CSplat::TtyrecListParser;
 
 our @EXPORT_OK = qw/fetch_listing/;
 
@@ -41,6 +42,14 @@ sub sort_ttyrecs {
   sort { $a->{timestr} cmp $b->{timestr} } @$ref
 }
 
+sub clean_ttyrec_url {
+  my ($baseurl, $url) = @_;
+  $url->{u} =~ s{^./}{};
+  $baseurl = "$baseurl/" unless $baseurl =~ m{/$};
+  $url->{u} = $baseurl . $url->{u};
+  $url
+}
+
 sub direct_fetch {
   my ($nick, $hostname, $url) = @_;
 
@@ -71,34 +80,6 @@ sub direct_fetch {
   \@ttyrecs
 }
 
-sub clean_ttyrec_url {
-  my ($baseurl, $url) = @_;
-  $url->{u} =~ s{^./}{};
-  $baseurl = "$baseurl/" unless $baseurl =~ m{/$};
-  $url->{u} = $baseurl . $url->{u};
-  $url
-}
-
-sub human_readable_size {
-  my $size = shift;
-  s/^\s+//, s/\s+$// for $size;
-  my ($suffix) = $size =~ /([KMG])$/i;
-  $size =~ s/[KMG]$//i;
-  if ($suffix) {
-    $suffix = lc($suffix);
-    $size *= 1024 if $suffix eq 'k';
-    $size *= 1024 * 1024 if $suffix eq 'm';
-    $size *= 1024 * 1024 * 1024 if $suffix eq 'g';
-  }
-  $size
-}
-
-sub ttyrec_url_timestring {
-  my $url = shift;
-  return $1 if $url =~ /(\d{4}-\d{2}.*)/;
-  return $url;
-}
-
 sub http_fetch {
   my ($nick, $server_url) = @_;
   $server_url = "$server_url/" unless $server_url =~ m{/$};
@@ -108,18 +89,9 @@ sub http_fetch {
     return;
   };
   print "Done fetching HTTP listing for $nick\n";
-  my (@urlsizes) = $listing =~ /<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["'].*?>\s*(\d+(?:\.\d+)?[kMB]|\d+)\s*</gis;
-  my @urls;
-  for (my $i = 0; $i < @urlsizes; $i += 2) {
-    my $url = $urlsizes[$i];
-    my $size = human_readable_size($urlsizes[$i + 1]);
-    push @urls, { u => $url,
-                  timestr => ttyrec_url_timestring($url),
-                  sz => $size };
-  }
-  my @ttyrecs = map(clean_ttyrec_url($server_url, $_),
-                    grep($_->{u} =~ /\.ttyrec/, @urls));
-  @ttyrecs = sort_ttyrecs(\@ttyrecs);
+  my @urls = CSplat::TtyrecListParser->new()->parse($server_url, $listing);
+  clean_ttyrec_url($server_url, $_) for @urls;
+  my @ttyrecs = sort_ttyrecs(\@urls);
   print "Sorted HTTP listing for $nick, ", scalar(@ttyrecs), " files found\n";
   \@ttyrecs
 }
