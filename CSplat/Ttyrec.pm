@@ -157,17 +157,22 @@ sub download_ttyrecs {
   my @tofetch;
 
   my $first_ttyrec_time = $turn_seek && $turn_seek->start_time();
+  print("Game " . desc_game($g) . ", eligible ttyrec list: " .
+        join(", ", map($_->{u}, @ttyrs)) . "\n");
   for my $tty (@ttyrs) {
     last if !$first_ttyrec_time && $sz >= $TTYRDEFSZ;
 
     my $ttysz = $tty->{sz};
     $ttysz = fudge_size($ttysz, $tty->{u});
     $sz += $ttysz;
+    print "Considering: $tty->{u}, ttysz: $tty->{sz}, size: $sz, defsz: $TTYRDEFSZ\n";
 
     push @tofetch, $tty;
 
     if ($first_ttyrec_time &&
         ttyrec_file_time($tty->{u}) lt $first_ttyrec_time) {
+      print("First ttyrec time: $first_ttyrec_time, ttyrec time: " .
+            ttyrec_file_time($tty->{u}) . ", exiting\n");
       last;
     }
   }
