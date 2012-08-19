@@ -109,4 +109,14 @@ sub end_time {
   ($end && $self->timestamp_for_turn($end)) || $self->default_end_time()
 }
 
+sub str {
+  my $self = shift;
+  my $start = $self->{start} || '?';
+  my $end = $self->{end} || '?';
+  my $start_time = $self->start_time();
+  my $end_time = $self->end_time();
+  my $hard_start_time = $self->hard_start_time() && ' (hard)' || '';
+  "Seek[${start}->$end ($start_time -> $end_time)$hard_start_time]"
+}
+
 1

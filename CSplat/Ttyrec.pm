@@ -282,7 +282,7 @@ sub time_delta_seconds {
 }
 
 sub ttyrecs_filter_between {
-  my ($game_start, $end, @ttyrecs) = @_;
+  my ($game_start, $playback_start, $playback_end, @ttyrecs) = @_;
 
   # The first ttyrec for a game usually has a timestamp preceding the
   # actual game start time, since dgl opens the ttyrec file before
@@ -293,21 +293,21 @@ sub ttyrecs_filter_between {
   # considered a part of the game.
   my $oldest_ttyrec_before_start = 3600;
 
-  my $start = $game_start;
-  if ($game_start) {
+  my $filter_start = $playback_start;
+  if ($playback_start) {
     for my $ttyrec (reverse @ttyrecs) {
       my $time = ttyrec_file_time($$ttyrec{u});
-      if ($time le $game_start) {
+      if ($time le $playback_start) {
         if (time_delta_seconds($time, $game_start) <
             $oldest_ttyrec_before_start) {
-          $start = $time;
+          $filter_start = $time;
         }
         last;
       }
     }
   }
 
-  grep(ttyrec_between($_->{u}, $start, $end), @ttyrecs)
+  grep(ttyrec_between($_->{u}, $filter_start, $playback_end), @ttyrecs)
 }
 
 sub game_turn_based_seek {
@@ -317,10 +317,13 @@ sub game_turn_based_seek {
 
 sub fetch_ttyrecs {
   my ($listener, $g, $no_death_check) = @_;
-  my $start = tty_time($g, 'start');
+
+  my $game_start = tty_time($g, 'start');
+  my $start = $game_start;
   my $end = tty_time($g, 'end') || tty_time($g, 'time');
 
   my $turn_seek = game_turn_based_seek($g);
+  print("Turn-based seek: ", $turn_seek->str(), "\n") if $turn_seek;
 
   if ($turn_seek) {
     $start = $turn_seek->start_time() || $start;
@@ -334,7 +337,8 @@ sub fetch_ttyrecs {
     return;
   };
 
-  my @filtered_ttyrecs = ttyrecs_filter_between($start, $end, @ttyrecs);
+  my @filtered_ttyrecs = ttyrecs_filter_between($game_start, $start, $end,
+                                                @ttyrecs);
   unless (@filtered_ttyrecs) {
     warn "No ttyrecs between $start and $end for ", desc_game($g), "\n";
     return;
