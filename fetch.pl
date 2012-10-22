@@ -69,11 +69,21 @@ sub run_fetch {
 
   $server->close();
 
-  while ($live_thread_count > 0) {
-    sleep 2;
+  my $wait_max = 180;
+  my $waited = 0;
+  my $wait_interval = 2;
+  while ($live_thread_count > 0 && $waited < $wait_max) {
     print "Waiting for fetch threads to exit\n";
+    sleep $wait_interval;
+
+    $waited += $wait_interval;
   }
-  print "All threads completed, shutting down.\n";
+
+  if ($live_thread_count == 0) {
+    print "All threads completed, shutting down.\n";
+  } else {
+    print "Force-shut down after $waited s, ignoring $live_thread_count rogue threads\n";
+  }
 }
 
 sub process_command {
