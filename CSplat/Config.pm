@@ -47,6 +47,7 @@ our %SERVMAP =
      ttypath => ['http://termcast.develz.org/ttyrecs/$player$',
                  'http://crawl.develz.org/ttyrecs/$player$' ],
      timestamp_path => ['http://crawl.develz.org/morgues/trunk/$player$',
+                        'http://crawl.develz.org/morgues/0.11/$player$',
                         'http://crawl.develz.org/morgues/0.10/$player$',
                         'http://crawl.develz.org/morgues/0.9/$player$',
                         'http://crawl.develz.org/morgues/0.8/$player$',
