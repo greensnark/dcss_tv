@@ -30,6 +30,11 @@ sub initialize {
 
   my $seekbefore = game_seek_turn($$g{seekbefore});
   my $seekafter = game_seek_turn($$g{seekafter});
+
+  if (!defined($seekbefore) && !defined($seekafter) && $$g{seekafter} eq '>')
+  {
+    $self->{end_of_game} = 1;
+  }
   #return unless defined($seekbefore) || defined($seekafter);
 
   my $start = $self->resolve_turn($seekbefore);
@@ -39,13 +44,24 @@ sub initialize {
 
   $self->{start_time} = tty_time($g, 'start');
   # No defined end_time if this is not a milestone:
-  $self->{end_time} = tty_time($g, 'time');
+  $self->{time} = $self->{end_time} = tty_time($g, 'time');
+
+  $self->{end_time} = $self->resolve_game_end_time() if $self->{end_of_game};
 
   # For milestones, if there is a defined end-time, make the start time the
   # milestone time.
-  if ($end && $self->{end_time}) {
-    $self->{milestone_start_time} = $self->{end_time};
+  if (($end || $self->{end_of_game}) && $self->{time}) {
+    $self->{milestone_start_time} = $self->{time};
   }
+}
+
+sub resolve_game_end_time {
+  my $self = shift;
+  my $g = $$self{g};
+  return tty_time($$g{end}) if $$g{end};
+
+  print "\n\nLooking for end of game time\n";
+  $self->timestamp_for_turn(-1)
 }
 
 sub resolve_turn {
@@ -93,7 +109,7 @@ sub timestamp_for_turn {
 sub start_time {
   my $self = shift;
   my $start = $self->start_turn();
-  $start && $self->timestamp_for_turn($start) ||
+  ($start && $self->timestamp_for_turn($start)) ||
     $self->{milestone_start_time}
 }
 
@@ -101,6 +117,11 @@ sub start_time {
 sub hard_start_time {
   my $self = shift;
   defined($self->{start})
+}
+
+sub hard_end_time {
+  my $self = shift;
+  $self->{end_time} && $self->end_turn()
 }
 
 sub end_time {

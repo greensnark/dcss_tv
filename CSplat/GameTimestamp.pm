@@ -27,7 +27,11 @@ sub initialize {
 }
 
 sub timestamp_file_offset {
-  my $turn = shift;
+  my ($turn, $filesize, $eof) = @_;
+  if ($eof) {
+    die "Timestamp file is too small" unless $filesize >= 8;
+    return $filesize - $filesize % 4 - 4;
+  }
   my $slab = int($turn / 100) - 1;
   4 + 4 * $slab
 }
@@ -48,19 +52,20 @@ sub find_timestamp_for_turn {
   return '' unless defined $turn;
 
   my $end_turn = $self->end_turn();
+  my $eof = $turn == -1;
   if ($end_turn && $turn > $end_turn) {
-    $turn = $end_turn;
+    $eof = 1;
   }
 
-  if ($turn < 100) {
+  if ($turn >= 0 && $turn < 100) {
     return tty_time($self->{g}, 'start');
   }
 
   open my $inf, '<', $file;
   binmode $inf;
 
-  my $offset = timestamp_file_offset($turn);
-  #print "Seeking to offset $offset in $file for turn $turn\n";
+  my $offset = timestamp_file_offset($turn, -s($file), $eof);
+  print "Seeking to offset $offset in $file for turn $turn\n";
   seek($inf, $offset, 0) or
     die "Cannot find turn $turn in timestamp file $file\n";
   my $ts;

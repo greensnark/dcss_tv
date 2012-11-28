@@ -123,6 +123,7 @@ sub tty_calc_frame_offset {
   $end_ttyrec = $ttyrecs[$#ttyrecs];
 
   my $turn_seek = CSplat::TurnSeek->new($g);
+  print "Turn seek: " . $turn_seek->str() . "\n" if $turn_seek;
 
   # For regular games, the implicit end time is the end of the last ttyrec.
   # For milestones and turn-based TV requests, the end time is explicit:
@@ -203,7 +204,7 @@ sub tty_calc_frame_offset {
         && $seekafter != -100)
     {
       print "Seek after: $seekafter\n";
-      if ($turn_seek && $turn_seek->end_turn()) {
+      if ($turn_seek && $turn_seek->hard_end_time()) {
         $stop_offset = $end_offset;
       } else {
         my $endpad = $MS_SEEK_AFTER;

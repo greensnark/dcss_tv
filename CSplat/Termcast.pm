@@ -158,7 +158,7 @@ sub frame_delay_provider {
   my $g = shift;
   my $idle_clamp = $$g{idle_clamp} || 4;
   my $speed_up = $$g{playback_speed} || 1;
-  $speed_up = 10 if $speed_up > 10;
+  $speed_up = 500 if $speed_up > 500;
   $speed_up = 0.1 if $speed_up < 0.1;
   return sub {
     my $wait = shift;
