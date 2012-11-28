@@ -108,7 +108,8 @@ sub timestamp {
 sub timestamp_for_turn {
   my ($self, $turn, $first_ttyrec_start_time) = @_;
   if (($turn == 0 || $turn == 1) && $self->{start_time}) {
-    return $first_ttyrec_start_time || $self->{start_time};
+    return $first_ttyrec_start_time || $self->{start_time} if $turn == 0;
+    return $self->{start_time};
   }
   $self->timestamp()->timestamp_for_turn($turn)
 }
