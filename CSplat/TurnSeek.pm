@@ -11,7 +11,7 @@ use CSplat::TtyTime qw/tty_time/;
 sub new {
   my $self = bless({}, shift());
   $self->initialize(@_);
-  return undef unless $self->start_turn() || $self->end_turn() || $self->{end_time};
+  return undef unless $self->has_start_turn() || $self->end_turn() || $self->{end_time};
 
   $self
 }
@@ -79,6 +79,11 @@ sub start_turn {
   $self->{start}
 }
 
+sub has_start_turn {
+  my $self = shift;
+  defined($self->{start})
+}
+
 sub end_turn {
   my $self = shift;
   my $end = $self->{end};
@@ -101,15 +106,18 @@ sub timestamp {
 }
 
 sub timestamp_for_turn {
-  my ($self, $turn) = @_;
-  return $self->{start_time} if $turn == 0 || $turn == 1 && $self->{start_time};
+  my ($self, $turn, $first_ttyrec_start_time) = @_;
+  if (($turn == 0 || $turn == 1) && $self->{start_time}) {
+    return $first_ttyrec_start_time || $self->{start_time};
+  }
   $self->timestamp()->timestamp_for_turn($turn)
 }
 
 sub start_time {
-  my $self = shift;
+  my ($self, $first_ttyrec_start_time) = @_;
   my $start = $self->start_turn();
-  ($start && $self->timestamp_for_turn($start)) ||
+  (defined($start) &&
+       $self->timestamp_for_turn($start, $first_ttyrec_start_time)) ||
     $self->{milestone_start_time}
 }
 
@@ -132,7 +140,7 @@ sub end_time {
 
 sub str {
   my $self = shift;
-  my $start = $self->{start} || '?';
+  my $start = defined($self->{start}) ? $self->{start} : '?';
   my $end = $self->{end} || '?';
   my $start_time = $self->start_time();
   my $end_time = $self->end_time();

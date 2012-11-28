@@ -8,7 +8,8 @@ use lib '..';
 our @EXPORT_OK = qw/tty_frame_offset clear_screen set_buildup_size/;
 
 use CSplat::DB qw/tty_precalculated_frame_offset tty_save_frame_offset/;
-use CSplat::Ttyrec qw/ttyrec_path $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
+use CSplat::Ttyrec qw/ttyrec_path ttyrec_file_time
+                      $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
 use CSplat::Xlog qw/desc_game_brief/;
 use CSplat::TurnSeek;
 use CSplat::GameTimestamp;
@@ -139,8 +140,10 @@ sub tty_calc_frame_offset {
     $end_offset = $seek_frame_offset;
   }
 
-  my $explicit_start_time = $turn_seek && $turn_seek->start_time();
-  print "Explicit start time: $explicit_start_time\n";
+  my $first_ttyrec_start_time = ttyrec_file_time($ttyrecs[0]);
+  my $explicit_start_time =
+    $turn_seek && $turn_seek->start_time($first_ttyrec_start_time);
+  print "Explicit start time: $explicit_start_time (first ttyrec: $first_ttyrec_start_time)\n";
   if ($explicit_start_time) {
     $start_ttyrec = $ttyrecs[0];
     my ($start, $end, $seek_frame_offset) =

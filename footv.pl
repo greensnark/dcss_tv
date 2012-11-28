@@ -341,10 +341,9 @@ sub request_tv {
   $TV->callback(\&cancel_playing_games);
 
  RELOOP:
+  $TV->clear();
   while (1) {
-    $TV->clear();
     flag_idle($TV);
-    $TV->write("\e[1H");
     if ($last_game) {
       $TV->clear();
       $TV->write("\e[1H");
@@ -386,10 +385,13 @@ sub request_tv {
         $TV->play_game($g);
       };
       if ($@) {
+        $TV->clear();
         $TV->write("\e[1;31mPlayback failed for: \e[0m\r\n",
                    desc_game_brief($g), ": $@\r\n");
+        undef $last_game;
+      } else {
+        $last_game = $g;
       }
-      $last_game = $g;
     }
   }
 }

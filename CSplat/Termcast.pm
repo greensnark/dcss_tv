@@ -52,7 +52,7 @@ sub callback {
 sub clear {
   my $self = shift;
   $self->connect();
-  $self->write("\e[2J\ec");
+  $self->write("\e[2J\ec\e[1H");
 }
 
 sub reset {
@@ -222,21 +222,15 @@ sub play_game {
 sub play_game_ttyrecs {
   my ($self, $g) = @_;
 
-  my $playback_range =
-    eval {
-      tty_frame_offset($g)
-    };
+  my $playback_range = eval { tty_frame_offset($g) };
 
-  warn $@ if $@;
-
-  if ($@) {
-    $self->clear();
-    $self->write("Ttyrec appears corrupted.\r\n");
-  }
-
-  if (!$playback_range) {
-    $self->write("Could not find playback range, aborting.\r\n");
-    return;
+  my $err = $@;
+  if ($err || !$playback_range) {
+    my $msg = "Ttyrec appears corrupted";
+    if ($err) {
+      $msg .= " (error: $err)";
+    }
+    die $msg;
   }
 
   $self->clear();
