@@ -141,6 +141,9 @@ sub tty_calc_frame_offset {
   }
 
   my $first_ttyrec_start_time = ttyrec_file_time($ttyrecs[0]);
+
+  # We may have an explicit start time, and hence an explicit start offset
+  # if the user specified a turn-based start point, say using <T1.
   my $explicit_start_time =
     $turn_seek && $turn_seek->start_time($first_ttyrec_start_time);
   print "Explicit start time: $explicit_start_time (first ttyrec: $first_ttyrec_start_time)\n";
@@ -151,11 +154,19 @@ sub tty_calc_frame_offset {
     $start_offset = $seek_frame_offset;
   }
 
+  # If we don't know where playback starts, set start and end to the
+  # same offsets. This does not mean nothing will be played back: the
+  # playback prelude size will govern the length of playback.
+  #
+  # This is the *most common case*, where the user did not specify a
+  # start-turn.
   if (!defined($start_offset)) {
     $start_offset = $end_offset || -s(ttyrec_path($g, $end_ttyrec));
     $start_ttyrec = $end_ttyrec;
   }
 
+  # size_before_playback_frame == size of ttyrec(s) before the start
+  # frame offset, ignoring the playback prelude.
   my $size_before_playback_frame = 0;
   for my $ttyrec (@ttyrecs) {
     my $ttyrec_size = -s(ttyrec_path($g, $ttyrec));
@@ -167,13 +178,26 @@ sub tty_calc_frame_offset {
     $size_before_playback_frame += $ttyrec_size;
   }
 
+  # The playback skip size is the size of the ttyrec(s) that are never
+  # displayed to the viewer. This is the amount of ttyrec before
+  # playback starts.
   my $playback_skip_size = 0;
+
+  # The playback prelude is the size of the playback before the actual
+  # ttyrec event that the viewer wants to see. For instance, when
+  # viewing a death with !lg *, the prelude size is the amount of
+  # ttyrec played back before the end of the game. For !lm, the
+  # prelude is the amount of ttyrec played back before the milestone.
+  #
+  # If the user requested a hard start *turn*, the prelude
+  # disappeared.
   my $playback_prelude_size = $explicit_end_time ? $MS_SEEK_BEFORE : $TTYRDEFSZ;
 
   if ($explicit_start_time && $turn_seek->hard_start_time()) {
     $playback_prelude_size = 0;
   } else {
-    # If the game itself requests a specific seek, oblige.
+    # If the game itself requests a specific seek, oblige. This is activated
+    # by <X, such as <3
     $playback_prelude_size *= $seekbefore unless $explicit_start_time;
   }
 
@@ -228,12 +252,15 @@ sub tty_calc_frame_offset {
 }
 
 sub tty_calc_offset_in {
-  my ($g, $deep, $ttr, $rsz, $skipsz, $ignore_hp) = @_;
+  my ($g, $deep, $ttyrec, $size_before_start_frame,
+      $skip_size, $ignore_hp) = @_;
   if ($deep) {
-    tty_find_offset_deep($g, $ttr, $rsz, $skipsz, $ignore_hp)
+    tty_find_offset_deep($g, $ttyrec, $size_before_start_frame,
+                         $skip_size, $ignore_hp)
   }
   else {
-    tty_find_offset_simple($g, $ttr, $rsz, $skipsz)
+    tty_find_offset_simple($g, $ttyrec, $size_before_start_frame,
+                           $skip_size)
   }
 }
 
@@ -344,15 +371,20 @@ sub tty_find_offset_deep {
 
 # This is the lightweight seek strategy. Can be used for on-the-fly seeking.
 sub tty_find_offset_simple {
-  my ($g, $ttyrec, $total_size, $skip, $buildup_from) = @_;
+  my ($g, $ttyrec, $size_before_start_frame, $skip, $buildup_from) = @_;
   my $ttyfile = ttyrec_path($g, $ttyrec);
 
   my $size = -s $ttyfile;
   my $skipsize = 0;
 
   if ($skip) {
-    $skipsize = $skip if $skip > 0 && $skip < $size;
+    $skipsize = $skip if $skip > 0 && $skip <= $size;
   }
+
+  no warnings qw/uninitialized/;
+  print("tty_find_offset_simple: game: " . desc_game_brief($g) . ", " .
+        "ttyrec: $ttyrec, size_before_start_frame: $size_before_start_frame:, skip: $skip (accepted skip: $skipsize), " .
+        "buildup_from: $buildup_from\n");
 
   my $t = Term::TtyRec::Plus->new(infile => $ttyfile,
                                   time_threshold => 3);
@@ -368,41 +400,60 @@ sub tty_find_offset_simple {
       my $pos = tell($t->filehandle());
       $prev_frame = $pos;
 
-      my $hasclear = index($fref->{data}, $clr) > -1;
+      my $hasclear = $prev_frame == 0 || index($fref->{data}, $clr) > -1;
       $lastclear = $pos if $hasclear;
-      $lastgoodclear = $pos if $hasclear && $total_size - $pos >= $TTYRMINSZ;
+      if ($hasclear && $size_before_start_frame - $pos >= $TTYRMINSZ) {
+        $lastgoodclear = $pos;
+      }
 
-      if ($buildup_from && $pos >= $buildup_from) {
+      if (defined($buildup_from) && $pos >= $buildup_from) {
         tv_cache_frame(tv_frame_strip($fref->{data}));
       }
 
       next if $pos < $skipsize;
 
       if ($hasclear) {
-        my $size_left = $total_size - $pos;
+        my $size_left = $size_before_start_frame - $pos;
         if ($size_left < $TTYRMINSZ && $lastgoodclear < $pos
-            && $total_size - $lastgoodclear >= $TTYRMINSZ
-            && !$buildup_from)
+            && $size_before_start_frame - $lastgoodclear >= $TTYRMINSZ
+            && !defined($buildup_from))
         {
           close($t->filehandle());
-          return tty_find_offset_simple($g, $ttyrec, $total_size,
+          return tty_find_offset_simple($g, $ttyrec, $size_before_start_frame,
                                         $skipsize, $lastgoodclear);
         }
 
         undef $skipsize;
       } else {
-        # If we've been building up a frame in our VT102, spit that out now.
-        if ($buildup_from && $buildup_from < $pos) {
+        if (defined($buildup_from)) {
+          # If we've been building up a frame in our VT102, spit that out now.
+          if ($buildup_from < $pos) {
+            close($t->filehandle());
+            return ($ttyrec, $pos, undef, tv_frame());
+          }
+        }
+        # Last effort: if there is a screen-clear within the VT102
+        # build-up size threshold, go back and build up frames from
+        # there.
+        elsif ($pos - ($lastgoodclear || $lastclear) <= $BUILDUP_SIZE) {
           close($t->filehandle());
-          return ($ttyrec, $pos, undef, tv_frame());
+          return tty_find_offset_simple($g, $ttyrec, $size_before_start_frame,
+                                        $skipsize,
+                                        $lastgoodclear || $lastclear);
         }
         next;
       }
     }
+
+    # No frame build-up possible, hopefully this is the start of a
+    # ttyrec (good) or we're dropping the user into the middle of a
+    # ttyrec stream (bad). Either way, there is nothing we can do
+    # here.
     close($t->filehandle());
     return ($ttyrec, $prev_frame, undef, '');
   }
-  # If we get here, ouch.
+
+  # Ouch: ttyrec is broken (empty or malformed).
   (undef, undef, undef, undef)
 }
 
