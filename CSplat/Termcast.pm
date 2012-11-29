@@ -173,12 +173,6 @@ sub play_ttyrec {
 
   $self->title(game_title($g));
   $self->write($frame) if $frame;
-  if ($frame) {
-    open my $outf, '>', 'frame.txt' or die "NOOO";
-    print $outf $frame;
-    close $outf;
-    exit 1;
-  }
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 
   my $frame_delay = frame_delay_provider($g);
