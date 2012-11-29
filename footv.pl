@@ -12,6 +12,8 @@ use CSplat::Termcast;
 use CSplat::Request;
 use CSplat::ChannelMonitor;
 use CSplat::Channel;
+use CSplat::Util;
+use File::Path qw/make_path/;
 use TV::ChannelQuery;
 use Term::TtyRec::Plus;
 use IO::Socket::INET;
@@ -29,6 +31,10 @@ my @stop_list : shared;
 
 my @recently_played;
 my $DUPE_SUPPRESSION_THRESHOLD = 9;
+
+END {
+  kill HUP => -$$;
+}
 
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'local-request',
@@ -282,6 +288,9 @@ sub update_status {
 
 sub exec_channel_player {
   my $channel = shift;
+  make_path('channels/logs');
+  my $logfile = "channels/logs/${channel}.log";
+  CSplat::Util::open_logfile($logfile);
   exec("perl $0 --auto_channel \Q$channel")
 }
 
