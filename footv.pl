@@ -348,9 +348,9 @@ sub request_tv {
   $rcheck->detach;
 
   $TV->callback(\&cancel_playing_games);
+  $TV->clear();
 
  RELOOP:
-  $TV->clear();
   while (1) {
     flag_idle($TV);
     if ($last_game) {
