@@ -401,9 +401,9 @@ sub tty_find_offset_simple {
       $prev_frame = $pos;
 
       my $hasclear = $prev_frame == 0 || index($fref->{data}, $clr) > -1;
-      $lastclear = $pos if $hasclear;
+      $lastclear = $prev_frame if $hasclear;
       if ($hasclear && $size_before_start_frame - $pos >= $TTYRMINSZ) {
-        $lastgoodclear = $pos;
+        $lastgoodclear = $prev_frame;
       }
 
       if (defined($buildup_from) && $pos >= $buildup_from) {
@@ -446,9 +446,7 @@ sub tty_find_offset_simple {
     }
 
     # No frame build-up possible, hopefully this is the start of a
-    # ttyrec (good) or we're dropping the user into the middle of a
-    # ttyrec stream (bad). Either way, there is nothing we can do
-    # here.
+    # ttyrec (good) or this frame has a screen clear.
     close($t->filehandle());
     return ($ttyrec, $prev_frame, undef, '');
   }
