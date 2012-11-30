@@ -398,13 +398,12 @@ sub tty_find_offset_simple {
   while (my $fref = $t->next_frame()) {
     if ($skipsize) {
       my $pos = tell($t->filehandle());
-      $prev_frame = $pos;
-
       my $hasclear = $prev_frame == 0 || index($fref->{data}, $clr) > -1;
       $lastclear = $prev_frame if $hasclear;
       if ($hasclear && $size_before_start_frame - $pos >= $TTYRMINSZ) {
         $lastgoodclear = $prev_frame;
       }
+      $prev_frame = $pos;
 
       if (defined($buildup_from) && $pos >= $buildup_from) {
         tv_cache_frame(tv_frame_strip($fref->{data}));
@@ -448,7 +447,7 @@ sub tty_find_offset_simple {
     # No frame build-up possible, hopefully this is the start of a
     # ttyrec (good) or this frame has a screen clear.
     close($t->filehandle());
-    return ($ttyrec, $prev_frame, undef, '');
+    return ($ttyrec, $lastclear, undef, '');
   }
 
   # Ouch: ttyrec is broken (empty or malformed).
