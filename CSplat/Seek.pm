@@ -369,6 +369,28 @@ sub tty_find_offset_deep {
   (undef, undef, undef, undef)
 }
 
+sub ttyrec_seek_frame {
+  my ($g, $ttyrec, $size_before_start_frame, $skip, $buildup_from,
+      $playback_start_frame) = @_;
+  if (-x 'bin/ttyrec-seek-frame') {
+    my $ttyrec_file_path = ttyrec_path($g, $ttyrec);
+    my $command =
+      qq{./bin/ttyrec-seek-frame $ttyrec_file_path $playback_start_frame};
+
+    local $SIG{CHLD};
+    my $output = qx{$command};
+    my $res = $?;
+    if ($res >> 8) {
+      warn "$command execution failed ($res)\n";
+    } else {
+      return ($ttyrec, $playback_start_frame, undef, $output);
+    }
+  }
+
+  tty_find_offset_simple($g, $ttyrec, $size_before_start_frame, $skip,
+                         $buildup_from)
+}
+
 # This is the lightweight seek strategy. Can be used for on-the-fly seeking.
 sub tty_find_offset_simple {
   my ($g, $ttyrec, $size_before_start_frame, $skip, $buildup_from) = @_;
@@ -418,8 +440,8 @@ sub tty_find_offset_simple {
             && !defined($buildup_from))
         {
           close($t->filehandle());
-          return tty_find_offset_simple($g, $ttyrec, $size_before_start_frame,
-                                        $skipsize, $lastgoodclear);
+          return ttyrec_seek_frame($g, $ttyrec, $size_before_start_frame,
+                                   $skipsize, $lastgoodclear, $pos);
         }
 
         undef $skipsize;
@@ -436,9 +458,10 @@ sub tty_find_offset_simple {
         # there.
         elsif ($pos - ($lastgoodclear || $lastclear) <= $BUILDUP_SIZE) {
           close($t->filehandle());
-          return tty_find_offset_simple($g, $ttyrec, $size_before_start_frame,
-                                        $skipsize,
-                                        $lastgoodclear || $lastclear);
+          return ttyrec_seek_frame($g, $ttyrec, $size_before_start_frame,
+                                   $skipsize,
+                                   $lastgoodclear || $lastclear,
+                                   $pos);
         }
         next;
       }
