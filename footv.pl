@@ -114,6 +114,7 @@ sub queue_games_automatically {
   my $query;
   while (1) {
     if (!CSplat::Channel::channel_exists($TERMCAST_CHANNEL)) {
+      warn "Channel $TERMCAST_CHANNEL no longer exists, terminating\n";
       terminate_auto_footv();
     }
 
@@ -126,6 +127,7 @@ sub queue_games_automatically {
 
     my $list_attempts = 30;
     while (@queued_playback < 5 && $list_attempts-- > 0) {
+      print "Asking channel server for next game for $TERMCAST_CHANNEL\n";
       my $game = $query->next_game();
       unless ($game) {
         print "Channel server provided no game for $def, will retry later\n";
@@ -393,10 +395,13 @@ sub request_tv {
       eval {
         $TV->play_game($g);
       };
-      if ($@) {
+
+      my $err = $@;
+      warn "Completed playback for ", desc_game($g), " for $TERMCAST_CHANNEL. Error: $err\n";
+      if ($err) {
         $TV->clear();
         $TV->write("\e[1;31mPlayback failed for: \e[0m\r\n",
-                   desc_game_brief($g), ": $@\r\n");
+                   desc_game_brief($g), ": $err\r\n");
         undef $last_game;
       } else {
         $last_game = $g;
