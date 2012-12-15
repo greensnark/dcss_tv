@@ -6,6 +6,10 @@ use warnings;
 use IO::Handle;
 use Getopt::Long;
 
+END {
+  kill TERM => -$$;
+}
+
 # The plot:
 # 1) wait for requests on IRC
 # 2) on request, fork and play request, or queue request.

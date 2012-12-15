@@ -93,11 +93,15 @@ sub show_errors {
 
 sub show_queue {
   my @fights = @queued_fights;
-  return unless @fights;
+  unless (@fights) {
+    $TV->title("[waiting]");
+    return;
+  }
 
   @fights = @fights[0 .. 4] if @fights > 5;
 
   $TV->write("\e[1;37mComing up\e[0m\r\n");
+  my $first = 0;
   for my $fight (@fights) {
     $TV->write("$fight\r\n");
   }
@@ -132,20 +136,21 @@ sub announce_arena {
 }
 
 sub arena_tv {
+  announce_arena();
   while (1) {
-    announce_arena();
     sleep 1;
     next unless @queued_fights || @queued_cancels;
+    announce_arena();
     handle_cancels();
 
     my $fight = shift @queued_fights;
     next unless $fight;
 
     play_fight($fight);
-
-    sleep 4 unless @bad_requests;
-
     $TV->reset();
+    announce_arena();
+
+    sleep 1 if @bad_requests;
   }
 }
 
@@ -249,6 +254,8 @@ sub play_fight {
   $what =~ s/delay:(\d+)/ "delay:" . ($1 < 15 ? 15 : $1) /ge;
 
   $current_fight = $what;
+  $TV->clear();
+  $TV->title("$current_fight");
 
   my $pty = IO::Pty::Easy->new;
 
@@ -257,11 +264,11 @@ sub play_fight {
 
   unlink $ARENA_RESULT;
 
-  $pty->spawn("./crawl -arena \Q$what\E");
+  $pty->spawn("./crawl", "-arena", "$what");
 
   while ($pty->is_active) {
     if (handle_cancels()) {
-      $pty->kill('KILL', undef);
+      kill 9 => $pty->pid() if $pty->pid();
       last;
     }
 
@@ -271,6 +278,8 @@ sub play_fight {
     last if length($read) == 0;
     $TV->write($read);
   }
+
+  kill 9 => $pty->pid() if $pty->pid();
   $pty->close();
 
   record_arena_result($who);
