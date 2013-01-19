@@ -104,7 +104,10 @@ sub desc_game_brief {
                 $$g{god},
                 $$g{place} !~ /\$$/ && $$g{place});
   if ($$g{extra}) {
-    push @pieces, grep($_, map($$g{$_} && "$_:$$g{$_}", split /,/, $$g{extra}));
+    my %seen_extras;
+    push @pieces, grep($_, map(($$g{$_} && !$seen_extras{$$g{$_}}++ &&
+                                "$_:$$g{$_}"),
+                               (split /,/, $$g{extra})));
   }
   @pieces = grep($_, @pieces);
   my $text = join(", ", @pieces);
