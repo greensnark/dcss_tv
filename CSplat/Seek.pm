@@ -378,7 +378,7 @@ sub ttyrec_seek_frame {
       qq{./bin/ttyrec-seek-frame $ttyrec_file_path $playback_start_frame};
 
     local $SIG{CHLD};
-    my $output = qx{$command};
+    my $output = tv_frame_strip(qx{$command});
     my $res = $?;
     if ($res >> 8) {
       warn "$command execution failed ($res)\n";
