@@ -23,6 +23,7 @@ my @bad_requests;
 my @fight_results;
 
 my $current_fight;
+my $MIN_DELAY = 100;
 
 local $SIG{CHLD} = sub { };
 
@@ -250,10 +251,11 @@ sub play_fight {
 
   return unless fight_ok($who, $what);
 
-  # Get rid of low-delay CPU-wastage.
-  $what =~ s/delay:(\d+)/ "delay:" . ($1 < 15 ? 15 : $1) /ge;
-
   $current_fight = $what;
+
+  # Get rid of low-delay CPU-wastage.
+  $what =~ s/delay:(\d+)/ "delay:" . ($1 < $MIN_DELAY ? $MIN_DELAY : $1) /ge;
+
   $TV->clear();
   $TV->title("$current_fight");
 
@@ -264,7 +266,7 @@ sub play_fight {
 
   unlink $ARENA_RESULT;
 
-  $pty->spawn("./crawl", "-arena", "$what");
+  $pty->spawn("./crawl", "-arena", $what);
 
   while ($pty->is_active) {
     if (handle_cancels()) {
