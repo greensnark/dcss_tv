@@ -23,7 +23,8 @@ my @bad_requests;
 my @fight_results;
 
 my $current_fight;
-my $MIN_DELAY = 100;
+my $MIN_DELAY = 25;
+my $MAX_FIGHT_TIME_SECONDS = 10;
 
 local $SIG{CHLD} = sub { };
 
@@ -268,7 +269,13 @@ sub play_fight {
 
   $pty->spawn("./crawl", "-arena", $what);
 
+  my $fight_started_at = time;
+  my $fight_too_long;
   while ($pty->is_active) {
+    if ((time - $fight_started_at) > $MAX_FIGHT_TIME_SECONDS) {
+      $fight_too_long = 1;
+      last;
+    }
     if (handle_cancels()) {
       kill 9 => $pty->pid() if $pty->pid();
       last;
@@ -280,9 +287,14 @@ sub play_fight {
     last if length($read) == 0;
     $TV->write($read);
   }
-
   kill 9 => $pty->pid() if $pty->pid();
   $pty->close();
+
+  if ($fight_too_long) {
+    $TV->reset();
+    $TV->write("\"$what\" exceeded the time limit of ${MAX_FIGHT_TIME_SECONDS}s");
+    sleep 4;
+  }
 
   record_arena_result($who);
 
