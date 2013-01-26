@@ -24,7 +24,7 @@ my @fight_results;
 
 my $current_fight;
 my $MIN_DELAY = 25;
-my $MAX_FIGHT_TIME_SECONDS = 10;
+my $MAX_FIGHT_TIME_SECONDS = 10 * 60;
 
 local $SIG{CHLD} = sub { };
 
