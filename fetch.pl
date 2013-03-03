@@ -13,10 +13,9 @@ use IO::Socket::INET;
 use IO::Handle;
 
 use CSplat::Util qw/run_service/;
-use CSplat::Config qw/$FETCH_PORT/;
+use CSplat::Config;
 use CSplat::Ttyrec qw/clear_cached_urls fetch_ttyrecs/;
 use CSplat::Seek qw/tty_frame_offset/;
-use CSplat::Select qw/interesting_game/;
 use CSplat::Xlog qw/xlog_hash xlog_str desc_game/;
 
 use POSIX;
@@ -44,11 +43,12 @@ sub run_autovacuum {
 }
 
 sub run_fetch {
-  my $server = IO::Socket::INET->new(LocalPort => $FETCH_PORT,
+  my $fetch_port = CSplat::Config::fetch_port();
+  my $server = IO::Socket::INET->new(LocalPort => $fetch_port,
                                      Type => SOCK_STREAM,
                                      Reuse => 1,
                                      Listen => 5)
-    or die "Couldn't open server socket on $FETCH_PORT: $@\n";
+    or die "Couldn't open server socket on $fetch_port: $@\n";
 
   # Since the shared thread variables seem to leak, set a max request count.
   my $max_requests = $MAX_REQUEST_COUNT;

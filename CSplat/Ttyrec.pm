@@ -17,9 +17,8 @@ our @EXPORT_OK = qw/$TTYRMINSZ $TTYRMAXSZ $TTYRDEFSZ
                     ttyrecs_out_of_time_bounds request_download
                     request_cache_clear/;
 
-use CSplat::Config qw/$DATA_DIR $TTYREC_DIR $UTC_EPOCH
-                      $FETCH_PORT server_field server_list_field game_server
-                      resolve_player_directory/;
+use CSplat::Config;
+use CSplat::Notify;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
                     xlog_hash xlog_merge/;
 use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
@@ -27,10 +26,12 @@ use CSplat::Fetch qw/fetch_url/;
 use CSplat::TtyTime qw/tty_time/;
 use CSplat::TtyrecList;
 use CSplat::TtyrecDir;
+use CSplat::TtyrecSourceDir;
 use Carp;
 use Date::Manip;
 use LWP::Simple;
 use File::Path;
+use File::Spec;
 use IO::Socket::INET;
 use Term::TtyRec::Plus;
 use Tie::Cache;
@@ -49,16 +50,7 @@ our $TTYRDEFSZ = 130 * 1024;
 my $BZ2X = 11;
 my $GZX = 6.6;
 
-my $CACHE_MAX = 25;
-my %CACHED_TTYREC_URLS :shared;
-
 my @FETCH_LISTENERS;
-
-sub notify_fetch_listener {
-  my $listener = shift;
-  warn "Notify: ", @_, "\n";
-  $listener->(@_);
-}
 
 sub url_file {
   my $url = shift;
@@ -67,21 +59,19 @@ sub url_file {
 }
 
 sub clear_cached_urls {
-  %CACHED_TTYREC_URLS = ();
+  CSplat::TtyrecSourceDir::clear_cached_urls();
 }
 
 sub have_cached_listing_for_game {
   my $g = shift;
-  my @paths = find_game_ttyrec_list_path($g);
-
-  # Every URL path must be cached:
-  scalar(grep($CACHED_TTYREC_URLS{$_}, @paths)) == @paths
+  my $src = CSplat::Config::game_server_ttyrec_source($g);
+  $src->have_cached_listing(game_ttyrec_cache_time($g))
 }
 
 sub clear_cached_urls_for_game {
   my $g = shift;
-  my @paths = join(" ", find_game_ttyrec_list_path($g));
-  delete $CACHED_TTYREC_URLS{$_} for @paths;
+  my $src = CSplat::Config::gamea_server_ttyrec_source($g);
+  $src->clear_cached_listing();
 }
 
 sub ttyrecs_out_of_time_bounds {
@@ -150,24 +140,41 @@ sub uncompress_ttyrec {
 sub download_ttyrecs {
   my ($listener, $g, $no_checks, $turn_seek) = @_;
 
-  my $sz = 0;
-
+  # Reverse chronological order of all known ttyrecs for the game.
   my @ttyrs = reverse @{$g->{ttyrecurls}};
-
-  my @tofetch;
 
   my $first_ttyrec_time = $turn_seek && $turn_seek->start_time();
   print("Game " . desc_game($g) . ", eligible ttyrec list: " .
         join(", ", map($_->{u}, @ttyrs)) . "\n");
+
+  my $fetched_ttyrec_combined_size = 0;
+  my @fetched_ttyrecs;
   for my $tty (@ttyrs) {
-    last if !$first_ttyrec_time && $sz >= $TTYRDEFSZ;
+    last if !$first_ttyrec_time && $fetched_ttyrec_combined_size >= $TTYRDEFSZ;
 
-    my $ttysz = $tty->{sz};
-    $ttysz = fudge_size($ttysz, $tty->{u});
-    $sz += $ttysz;
-    print "Considering: $tty->{u}, ttysz: $tty->{sz}, size: $sz, defsz: $TTYRDEFSZ\n";
+    my $tty_url = $tty->{u};
+    CSplat::Notify::notify($listener, "Downloading $tty_url...");
+    my $path = ttyrec_path($g, $tty_url);
+    eval {
+      fetch_url($tty_url, $path);
+    };
+    if ($@) {
+      CSplat::Notify::notify($listener,
+                             "ERROR: Failed to fetch $tty_url: $@");
+      return undef;
+    }
+    uncompress_ttyrec($g, $tty) or do {
+      CSplat::Notify::notify($listener, "ERROR: Corrupted ttyrec: $tty_url");
+      return undef;
+    };
 
-    push @tofetch, $tty;
+    $path = ttyrec_path($g, $tty_url);
+
+    push @fetched_ttyrecs, $tty;
+    my $tty_sz = -s($path);
+    $fetched_ttyrec_combined_size += $tty_sz;
+    print "Considering: $tty_url, ttysz: $tty_sz, ",
+          "total size: $fetched_ttyrec_combined_size, defsz: $TTYRDEFSZ\n";
 
     if ($first_ttyrec_time &&
         ttyrec_file_time($tty->{u}) lt $first_ttyrec_time) {
@@ -177,44 +184,10 @@ sub download_ttyrecs {
     }
   }
 
-  if ($sz > $TTYRMAXSZ || (!$no_checks && $sz < $TTYRMINSZ)) {
-    print "ttyrec total size for " . desc_game($g) .
-      " = $sz is out of bounds.\n";
-    return;
-  }
-
-  @tofetch = reverse(@tofetch);
-  print "Downloading ", scalar(@tofetch), " ttyrecs for ", desc_game($g), "\n";
-  $sz = 0;
-  for my $url (@tofetch) {
-    notify_fetch_listener($listener, "Downloading $url->{u}...");
-    my $path = ttyrec_path($g, $url->{u});
-    eval {
-      fetch_url($url->{u}, ttyrec_path($g, $url->{u}));
-    };
-    if ($@) {
-      notify_fetch_listener($listener, "ERROR: Failed to fetch $$url{u}: $@");
-      return undef;
-    }
-    uncompress_ttyrec($g, $url) or do {
-      notify_fetch_listener($listener, "ERROR: Corrupted ttyrec: $$url{u}");
-      return undef;
-    };
-    $sz += -s(ttyrec_path($g, $url->{u}));
-  }
-
-  # Do we have a ttyrec with "You die..."? If not, discard the lot.
-  unless ($no_checks || is_death_ttyrec($g, $tofetch[-1]->{u})) {
-    for my $ttyrec (@tofetch) {
-      unlink ttyrec_path($g, $ttyrec->{u});
-    }
-    notify_fetch_listener($listener, "Game has no death ttyrec: " . desc_game($g));
-    return undef;
-  }
-
-  $g->{sz} = $sz;
-  $g->{ttyrecs} = join(" ", map($_->{u}, @tofetch));
-  $g->{ttyrecurls} = \@tofetch;
+  @fetched_ttyrecs = reverse(@fetched_ttyrecs);
+  $g->{sz} = $fetched_ttyrec_combined_size;
+  $g->{ttyrecs} = join(" ", map($_->{u}, @fetched_ttyrecs));
+  $g->{ttyrecurls} = \@fetched_ttyrecs;
 
   1
 }
@@ -337,6 +310,8 @@ sub fetch_ttyrecs {
     return;
   };
 
+  print "Ttyrecs:\n", join("\n", @ttyrecs), "\n";
+
   my @filtered_ttyrecs = ttyrecs_filter_between($game_start, $start, $end,
                                                 @ttyrecs);
   unless (@filtered_ttyrecs) {
@@ -360,63 +335,17 @@ sub fetch_ttyrecs {
     })
 }
 
-sub fetch_ttyrec_urls_from_server {
-  my ($listener, $name, $userpath, $time_wanted) = @_;
-
-  my $now = time();
-  my $cache = $CACHED_TTYREC_URLS{$userpath};
-  return @{$cache->[1]} if $cache && $cache->[0] >= $time_wanted;
-
-  notify_fetch_listener($listener,
-                        "Fetching ttyrec listing from " . $userpath . "...");
-
-  my $rttyrecs = CSplat::TtyrecList::fetch_listing($name, $userpath);
-  $rttyrecs = [] unless defined $rttyrecs;
-
-  if (length(keys %CACHED_TTYREC_URLS) > $CACHE_MAX) {
-    %CACHED_TTYREC_URLS = ();
-  }
-
-  $CACHED_TTYREC_URLS{$userpath} = shared_clone([ $now, $rttyrecs ]);
-  @$rttyrecs
-}
-
-sub fetch_ttyrec_urls_from_multiple_servers {
-  my ($listener, $name, $ruserpaths, $time_wanted) = @_;
-
-  if (@$ruserpaths == 1) {
-    return fetch_ttyrec_urls_from_server($listener, $name, $$ruserpaths[0],
-                                         $time_wanted);
-  }
-
-  my %merged_list;
-  for my $server_user_url (@$ruserpaths) {
-    my @ttyrecs = fetch_ttyrec_urls_from_server($listener,
-                                                $name, $server_user_url,
-                                                $time_wanted);
-    $merged_list{$_->{timestr}} = $_ for @ttyrecs;
-  }
-
-  map($merged_list{$_}, sort keys %merged_list)
-}
-
-sub find_game_ttyrec_list_path {
+sub game_ttyrec_cache_time {
   my $g = shift;
-  my @servpath = server_list_field($g, 'ttypath');
-  my @userpath =
-    map(resolve_player_directory($_, $g), @servpath);
-  return @userpath;
+  my $end = tty_time($g, 'end') || tty_time($g, 'time');
+  int(UnixDate($end, "%s"))
 }
 
 sub find_ttyrecs_for_game_player {
   my ($listener, $g) = @_;
 
-  my @ttyrecurls = find_game_ttyrec_list_path($g);
-  my $end = tty_time($g, 'end') || tty_time($g, 'time');
-  my $time = int(UnixDate($end, "%s"));
-  my @urls = fetch_ttyrec_urls_from_multiple_servers($listener, $g->{name},
-                                                     \@ttyrecurls, $time);
-  @urls
+  my $source = CSplat::Config::game_server_ttyrec_source($g);
+  $source->ttyrec_urls($listener, $g, game_ttyrec_cache_time($g))
 }
 
 sub ttyrec_file_time {
@@ -442,8 +371,8 @@ sub ttyrec_between {
 
 sub ttyrec_directory {
   my ($g, $url) = @_;
-  my $server = game_server($g);
-  my $dir = "$TTYREC_DIR/$server/$g->{name}";
+  my $server = CSplat::Config::game_server($g);
+  my $dir = CSplat::Config::ttyrec_dir() . "/$server/$g->{name}";
   mkpath( [ $dir ] ) unless -d $dir;
   $dir
 }
@@ -503,7 +432,7 @@ sub fetch_request {
   # Open connection and make request.
   while ($tries-- > 0) {
     my $sock = IO::Socket::INET->new(PeerAddr => 'localhost',
-                                     PeerPort => $FETCH_PORT,
+                                     PeerPort => CSplat::Config::fetch_port(),
                                      Type => SOCK_STREAM,
                                      Timeout => 15);
     unless ($sock) {

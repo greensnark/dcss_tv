@@ -7,7 +7,7 @@ use Getopt::Long;
 use CSplat::DB qw/open_db/;
 use CSplat::Xlog qw/desc_game desc_game_brief game_title xlog_hash xlog_str/;
 use CSplat::Ttyrec qw/request_download/;
-use CSplat::Select qw/filter_matches make_filter/;
+use CSplat::Select;
 use CSplat::Termcast;
 use CSplat::Request;
 use CSplat::ChannelMonitor;

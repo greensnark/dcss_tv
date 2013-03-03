@@ -5,7 +5,7 @@ use warnings;
 
 use File::Path;
 use CSplat::Util qw/run_service/;
-use CSplat::Config qw/$TTYREC_DIR/;
+use CSplat::Config;
 use CSplat::TtyrecDir;
 
 # How old a ttyrec directory must be before it will be blown away
@@ -19,7 +19,7 @@ sub main {
 
 sub each_ttyrec_directory(&) {
   my $action = shift;
-  my $dir = CSplat::TtyrecDir->new($TTYREC_DIR);
+  my $dir = CSplat::TtyrecDir->new(CSplat::Config::ttyrec_dir());
   $dir->each_player_directory($action);
 }
 

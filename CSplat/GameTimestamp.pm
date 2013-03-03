@@ -4,7 +4,7 @@ use warnings;
 package CSplat::GameTimestamp;
 use lib '..';
 
-use CSplat::Config qw/$TTYREC_DIR resolve_player_directory/;
+use CSplat::Config;
 use CSplat::Fetch;
 use CSplat::Xlog qw/desc_game_brief/;
 use CSplat::TtyTime qw/tty_time/;
@@ -21,9 +21,7 @@ sub initialize {
   my ($self, $g) = @_;
 
   $self->{g} = $g;
-
-  my @timestamp_paths = $self->timestamp_paths();
-  $self->fetch_timestamp_file(@timestamp_paths);
+  $self->fetch_timestamp_file($g)
 }
 
 sub timestamp_file_offset {
@@ -102,7 +100,7 @@ sub timestamp_paths {
   my $g = $self->{g};
   my $timestamp_file = timestamp_filename($g);
   map(resolve_player_directory($_, $g) . "/$timestamp_file",
-      CSplat::Config::server_list_field($g, 'timestamp_path'))
+      CSplat::Config::game_server_list_field($g, 'timestamp_path'))
 }
 
 sub timestamp_local_file_path {
@@ -110,23 +108,18 @@ sub timestamp_local_file_path {
   my $g = $$self{g};
   my $server = CSplat::Config::game_server($g);
 
-  my $dir = "$TTYREC_DIR/$server/$g->{name}/";
+  my $dir = CSplat::Config::ttyrec_dir() . "/$server/$g->{name}/";
   mkpath( [ $dir ] ) unless -d $dir;
   $dir . timestamp_filename($g)
 }
 
 sub fetch_timestamp_file {
-  my ($self, @urls) = @_;
+  my ($self, $g) = @_;
   $self->{file} = $self->timestamp_local_file_path();
+  my $timestamp_file = timestamp_filename($g);
   print("Downloading timestamp file to $self->{file}\n");
-  for my $url (@urls) {
-    eval {
-      CSplat::Fetch::fetch_url($url, $self->{file});
-    };
-    return unless $@;
-    warn "Error fetching timestamp file from $url: $@\n";
-  }
-  die "Could not fetch timestamp file for game from any of @urls\n";
+  my $src = CSplat::Config::game_server_timestamp_source($g);
+  $src->fetch_timestamp_file($timestamp_file, $self->{file});
 }
 
 1

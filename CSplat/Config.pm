@@ -3,21 +3,18 @@ use warnings;
 
 package CSplat::Config;
 
-use base 'Exporter';
-our @EXPORT_OK = qw/$DATA_DIR $TTYREC_DIR %SERVMAP
-                    $UTC_EPOCH $UTC_BEFORE $UTC_AFTER
-                    $FETCH_PORT server_field server_list_field game_server
-                    resolve_player_directory/;
-
 use Carp;
+use Date::Manip;
+use YAML::Any;
+use CSplat::TtyrecSource;
+use CSplat::TimestampSource;
 use Date::Manip;
 
 our $DATA_DIR = 'data';
 our $TTYREC_DIR = "$DATA_DIR/ttyrecs";
 
-our $UTC_EPOCH = ParseDate("2008-07-30 10:30 UTC");
-our $UTC_BEFORE = DateCalc($UTC_EPOCH, "-1 days");
-our $UTC_AFTER = DateCalc($UTC_EPOCH, "+2 days");
+our %CFG = %{YAML::Any::LoadFile('config/sources.yml')};
+my %SERVABBREV = map(($_->{name} => $_), @{$CFG{sources}});
 
 # Port that the ttyrec fetch server listens on.
 our $FETCH_PORT = 41280;
@@ -34,83 +31,75 @@ if (-f $RC) {
 }
 print "Fetch port: $FETCH_PORT\n";
 
-our %SERVMAP =
-  ('crawl.akrasiac.org' => {
-     tz => 'EST',
-     dsttz => 'EDT',
-     ttypath => ['http://termcast.develz.org/cao/ttyrecs/$player$',
-                 'http://crawl.akrasiac.org/rawdata/$player$'],
-     timestamp_path => ['http://crawl.akrasiac.org/rawdata/$player$']
-   },
-   'crawl.develz.org' => {
-     tz => 'CET', dsttz => 'CEST',
-     ttypath => ['http://termcast.develz.org/ttyrecs/$player$',
-                 'http://crawl.develz.org/ttyrecs/$player$' ],
-     timestamp_path => ['http://crawl.develz.org/morgues/trunk/$player$',
-                        'http://crawl.develz.org/morgues/0.11/$player$',
-                        'http://crawl.develz.org/morgues/0.10/$player$',
-                        'http://crawl.develz.org/morgues/0.9/$player$',
-                        'http://crawl.develz.org/morgues/0.8/$player$',
-                        'http://crawl.develz.org/morgues/0.7/$player$',
-                        'http://crawl.develz.org/morgues/0.6/$player$',
-                        'http://crawl.develz.org/morgues/0.5/$player$',
-                        'http://crawl.develz.org/morgues/0.4/$player$']
-   },
-   'light.bitprayer.com' => {
-     http_fetch_only => 1,
-     tz => 'UTC', dsttz => 'UTC',
-     ttypath => ['http://light.bitprayer.com/userdata/$player$/ttyrec'],
-     timestamp_path => ['http://light.bitprayer.com/userdata/$player$/morgue']
-   },
-   'crawl.s-z.org' => {
-     http_fetch_only => 1,
-     tz => 'EST', dsttz => 'EDT',
-     ttypath => ['http://dobrazupa.org/ttyrec/$player$'],
-     timestamp_path => ['http://dobrazupa.org/morgue/$player$']
-   },
-);
+sub fetch_port {
+  $FETCH_PORT
+}
 
-our %SERVABBREV = (cao  => 'http://crawl.akrasiac.org/',
-                   cdo  => 'http://crawl.develz.org/',
-                   lbc  => 'http://light.bitprayer.com/',
-                   cszo => 'http://crawl.s-z.org/');
+sub data_dir {
+  $DATA_DIR
+}
+
+sub ttyrec_dir {
+  $TTYREC_DIR
+}
+
+sub server_cfg {
+  my $src = shift;
+  $SERVABBREV{$src} or die "No ttyrec server known for source '$src'\n"
+}
+
+sub server_base {
+  (server_cfg(shift) || {})->{base}
+}
+
+sub server_hostname {
+  my $base = server_base(shift);
+  return unless $base;
+  $base =~ qr{https?://([^/])+} && $1
+}
 
 sub game_server {
   my $g = shift;
   my $src = $g->{src};
-  $src = ($SERVABBREV{$src} || '') if $src =~ /^\w+$/;
-  my ($server) = $src =~ m{^http://(.*?)/};
-  die "No ttyrec server known for source '$$g{src}'\n" unless $server;
-  $server
+  server_hostname($src)
 }
 
-sub server_config {
-  my $server = shift;
-  $SERVMAP{$server}
-}
-
-sub server_field {
+sub game_server_field {
   my ($g, $field) = @_;
-  my $server = game_server($g);
-  my $sfield = server_config($server);
-  $sfield->{$field}
+  server_cfg($$g{src})->{$field}
 }
 
-sub http_fetch_only {
-  my $server = shift;
-  my $server_config = server_config($server);
-  $server_config && $server_config->{http_fetch_only}
-}
-
-sub server_list_field {
+sub game_server_list_field {
   my ($g, $field) = @_;
-  my $value = server_field($g, $field);
+  my $value = game_server_field($g, $field);
   if ($value && !ref($value)) {
     return ($value);
   }
   else {
     return @$value;
   }
+}
+
+sub game_server_ttyrec_source {
+  my $g = shift;
+  CSplat::TtyrecSource->new(game_server_field($g, 'ttyrecs'))->resolve($g)
+}
+
+sub game_server_timestamp_source {
+  my $g = shift;
+  CSplat::TimestampSource->new(game_server_field($g, 'timestamps'))->resolve($g)
+}
+
+sub game_server_utc_epoch {
+  my $g = shift;
+  my $epoch = game_server_field($g, 'utc-epoch');
+  return unless $epoch;
+  ParseDate($epoch)
+}
+
+sub game_server_timezone {
+  my ($g, $tz) = @_;
+  game_server_field($g, 'timezones')->{$tz}
 }
 
 sub canonical_game_version {
@@ -125,19 +114,6 @@ sub canonical_game_version {
   }
   return 'trunk' if $file =~ /-trunk/;
   return 'crawl';
-}
-
-sub resolve_game_field {
-  my ($field, $g) = @_;
-  return canonical_game_version($g) if $field eq 'game';
-  $field = 'name' if $field eq 'player';
-  $$g{$field}
-}
-
-sub resolve_player_directory {
-  my ($url, $g) = @_;
-  $url =~ s/\$(\w+)\$/ resolve_game_field($1, $g) /ge;
-  $url
 }
 
 1

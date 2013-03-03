@@ -17,7 +17,7 @@ our @EXPORT_OK = qw/%PLAYED_GAMES exec_query exec_do exec_all
 use Carp;
 
 use CSplat::Xlog qw/xlog_hash/;
-use CSplat::Config qw/$DATA_DIR $TTYREC_DIR/;
+use CSplat::Config;
 use File::Path;
 
 my $DBH;
@@ -26,7 +26,7 @@ my $TRAIL_DB = 'data/splat.db';
 our %PLAYED_GAMES;  # hash tracking db ids of ttyrecs played
 
 sub check_dirs {
-  mkpath( [ $DATA_DIR, $TTYREC_DIR ] );
+  mkpath( [ CSplat::Config::data_dir(), CSplat::Config::ttyrec_dir() ] );
 }
 
 sub in_transaction {
