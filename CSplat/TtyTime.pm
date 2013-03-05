@@ -16,7 +16,7 @@ sub tty_tz_time {
   my ($g, $time) = @_;
   my $dst = $time =~ /D$/;
   $time =~ s/[DS]$//;
-  my $tz = game_server_timezone($g, $dst? 'D' : 'S');
+  my $tz = CSplat::Config::game_server_timezone($g, $dst? 'D' : 'S');
   ParseDate("$time$tz")
 }
 
