@@ -171,7 +171,6 @@ sub frame_delay_provider {
 sub play_ttyrec {
   my ($self, $g, $ttyfile, $offset, $stop_offset, $frame) = @_;
 
-  $self->title(game_title($g));
   $self->write($frame) if $frame;
   warn "Playing ttyrec for ", desc_game($g), " from $ttyfile\n";
 

@@ -200,12 +200,20 @@ sub check_requests {
   }
 }
 
+sub channel_game_title {
+  my $g = shift;
+  if ($$g{req} ne $TERMCAST_CHANNEL && $$g{req} ne 'Henzell') {
+    $$g{extra} = join(",", $$g{extra} || '', 'req');
+  }
+  game_title($g)
+}
+
 sub tv_show_playlist {
   my ($TV, $rplay, $prev) = @_;
 
   $TV->clear();
   if (@$rplay) {
-    $TV->title(game_title($$rplay[0]));
+    $TV->title(channel_game_title($$rplay[0]));
   }
 
   if ($prev) {
@@ -276,7 +284,7 @@ sub update_status {
     } else {
       $TV->write("\e[1;34mRequest by $$f{req}:\e[0m\r\n",
                  desc_game_brief($f), "\r\n");
-      $TV->title(game_title($f));
+      $TV->title(channel_game_title($f));
       $TV->write("\r\nPlease wait, fetching game...\r\n");
       undef $$rlmsg;
     }

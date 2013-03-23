@@ -8,9 +8,13 @@ game's ttyrecs, downloads the ttyrecs and plays back the game on
 termcast.org, close to the end of the game, or close to the milestone
 event if provided a milestone.
 
+To install the Perl modules FooTV wants, run:
+
+# ./install-perl-modules
+
 To run FooTV, use:
 
-perl footv.pl
+$ perl footv.pl
 
 You'll first have to edit footv.pl to point at the server that
 broadcasts TV requests.
@@ -26,9 +30,9 @@ termcasts the resulting arena fight.
 
 To run FightClub, you need a local Crawl binary. Run FightClub as:
 
-CRAWL_HOME=/directory/where/crawl/binary/lives perl arena.pl
+$ CRAWL_HOME=/directory/where/crawl/binary/lives perl fight-club.pl
 
-FightClub runs its own IRC bot to take bot requests. Edit arena.pl to
-configure the request bot. arena.pl forks an arena-slave.pl process to
+FightClub runs its own IRC bot to take bot requests. Edit fight-club.pl to
+configure the request bot. fight-club.pl forks an arena-slave.pl process to
 run Crawl and termcast the fight. Edit arena-slave.pl to configure the
 termcast channel, etc.

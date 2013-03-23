@@ -95,6 +95,12 @@ sub game_title {
   desc_game_brief($g, 'title')
 }
 
+sub field_display_name {
+  my $field = shift;
+  return 'r' if $field eq 'req';
+  $field
+}
+
 sub desc_game_brief {
   my ($g, $title) = @_;
   my $xl = "$$g{xl}";
@@ -106,7 +112,7 @@ sub desc_game_brief {
   if ($$g{extra}) {
     my %seen_extras;
     push @pieces, grep($_, map(($$g{$_} && !$seen_extras{$$g{$_}}++ &&
-                                "$_:$$g{$_}"),
+                                field_display_name($_) . ":$$g{$_}"),
                                (split /,/, $$g{extra})));
   }
   @pieces = grep($_, @pieces);
