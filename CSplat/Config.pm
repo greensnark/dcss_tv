@@ -102,6 +102,11 @@ sub game_server_timezone {
   game_server_field($g, 'timezones')->{$tz}
 }
 
+sub game_server_rate_limit {
+  my $g = shift;
+  game_server_field($g, 'rate-limit')
+}
+
 sub canonical_game_version {
   my $g = shift;
   my $file = $$g{file};

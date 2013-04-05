@@ -11,7 +11,7 @@ use Fcntl qw/LOCK_EX/;
 our @EXPORT_OK = qw/fetch_url/;
 
 sub fetch_url {
-  my ($url, $file) = @_;
+  my ($url, $file, $rate_limit) = @_;
 
   my $lock = "$file.lock";
 
@@ -20,7 +20,11 @@ sub fetch_url {
   flock $lock_handle, LOCK_EX or die "Can't lock $lock: $!\n";
 
   $file ||= url_file($url);
-  my $command = "wget -q -c -O $file $url";
+
+  my $rate_limit_flag = $rate_limit ? "--limit-rate=$rate_limit" : '';
+
+  my $command = "wget -q -c $rate_limit_flag -O $file $url";
+  print "$command\n";
 
   local $SIG{CHLD};
   my $status = system($command);

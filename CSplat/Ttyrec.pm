@@ -156,7 +156,7 @@ sub download_ttyrecs {
     CSplat::Notify::notify($listener, "Downloading $tty_url...");
     my $path = ttyrec_path($g, $tty_url);
     eval {
-      fetch_url($tty_url, $path);
+      fetch_url($tty_url, $path, CSplat::Config::game_server_rate_limit($g));
     };
     if ($@) {
       CSplat::Notify::notify($listener,
@@ -310,7 +310,7 @@ sub fetch_ttyrecs {
     return;
   };
 
-  print "Ttyrecs:\n", join("\n", @ttyrecs), "\n";
+  print "Ttyrecs:\n", join("\n", map($_->{u}, @ttyrecs)), "\n";
 
   my @filtered_ttyrecs = ttyrecs_filter_between($game_start, $start, $end,
                                                 @ttyrecs);
