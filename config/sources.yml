@@ -1,7 +1,7 @@
 sources:
   - name: cao
     base: http://crawl.akrasiac.org
-    rate-limit: 200k
+    rate-limit: 800k
 
     # If the file exists in this path, it will be linked into the data
     # directory from the local path; otherwise it will be fetched
