@@ -8,9 +8,11 @@ use CSplat::DB qw/open_db/;
 use CSplat::Xlog qw/desc_game desc_game_brief game_title xlog_hash xlog_str/;
 use CSplat::Ttyrec qw/request_download/;
 use CSplat::Select;
+use CSplat::Channel;
 use CSplat::Termcast;
 use CSplat::Request;
 use CSplat::ChannelMonitor;
+use CSplat::FileChannelManager;
 use CSplat::Channel;
 use CSplat::Util;
 use File::Path qw/make_path/;
@@ -19,7 +21,6 @@ use Term::TtyRec::Plus;
 use IO::Socket::INET;
 use Date::Manip;
 use Fcntl qw/SEEK_SET/;
-
 use threads;
 use threads::shared;
 
@@ -28,9 +29,11 @@ my %opt;
 my @queued_fetch : shared;
 my @queued_playback : shared;
 my @stop_list : shared;
+my $TV_IS_IDLE :shared;
 
 my @recently_played;
 my $DUPE_SUPPRESSION_THRESHOLD = 9;
+
 
 END {
   kill HUP => -$$;
@@ -38,7 +41,15 @@ END {
 
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'local-request',
-           'simple', 'auto_channel=s') or die;
+           'simple', 'auto_channel=s', 'file_queue=s') or die;
+
+
+my $CHANMAN;
+unless ($opt{auto_channel}) {
+  $CHANMAN = CSplat::FileChannelManager->new(\&channel_player);
+}
+
+local $SIG{CHLD} = $CHANMAN->reaper() if $CHANMAN;
 
 # An appropriately Crawlish number.
 my $PLAYLIST_SIZE = 9;
@@ -49,6 +60,9 @@ my $REQUEST_PORT = $ENV{PLAYLIST_PORT} || 21976;
 my $TERMCAST_CHANNEL = $opt{auto_channel} || $ENV{TERMCAST_CHANNEL} || 'FooTV';
 my $REQUEST_IRC_CHANNEL = $ENV{REQUEST_IRC_CHANNEL} || '##crawl';
 my $AUTO_CHANNEL_DIR = 'channels';
+my $auto_channel = $opt{auto_channel};
+my $file_queue = $opt{'file_queue'};
+
 
 $REQUEST_HOST = 'localhost' if $opt{'local-request'};
 
@@ -145,6 +159,7 @@ sub queue_games_automatically {
 
 sub canonicalize_game {
   my $g = shift;
+  return $g unless $g;
   $g->{start} = $g->{rstart};
   $g->{end} = $g->{rend};
   $g->{time} = $g->{rtime};
@@ -157,7 +172,27 @@ sub next_request {
 
   $g = canonicalize_game($REQ->next_request());
 
+  if (!$g) {
+    if ($file_queue && $TV_IS_IDLE) {
+      print "Playlist empty and TV idle, exiting\n";
+      $REQ->delete_file_queue();
+      CSplat::Channel::delete_password_file($TERMCAST_CHANNEL);
+      exit;
+    }
+    return;
+  }
+
   $g->{cancel} = 'y' if ($g->{nuke} || '') eq 'y';
+
+  if (defined($g->{channel}) && !$file_queue) {
+    eval {
+      $CHANMAN->game_request($g);
+    };
+    if ($@) {
+      push @queued_fetch, "msg: Bad request: $@";
+    }
+    return;
+  }
 
   if (($g->{cancel} || '') eq 'y') {
     my $filter = CSplat::Select::make_filter($g);
@@ -177,7 +212,8 @@ sub next_request {
 
 sub check_irc_requests {
   my $REQ = CSplat::Request->new(host => $REQUEST_HOST,
-                                 port => $REQUEST_PORT);
+                                 port => $REQUEST_PORT,
+                                 file_queue => $file_queue);
 
   while (1) {
     next_request($REQ);
@@ -192,7 +228,7 @@ sub terminate_auto_footv {
 
 sub check_requests {
   open_db();
-  if ($opt{auto_channel} && !$opt{simple}) {
+  if ($opt{auto_channel} && !$file_queue && !$opt{simple}) {
     queue_games_automatically();
   }
   else {
@@ -297,18 +333,26 @@ sub update_status {
 }
 
 sub exec_channel_player {
-  my $channel = shift;
+  my ($channel, $file_queue) = @_;
   make_path('channels/logs');
   my $logfile = "channels/logs/${channel}.log";
   CSplat::Util::open_logfile($logfile);
-  exec("perl $0 --auto_channel \Q$channel")
+
+  my $cmd = "perl $0 --auto_channel \Q$channel";
+  if ($file_queue) {
+    $cmd .= " --file_queue \Q$file_queue";
+  }
+  if ($opt{local}) {
+    $cmd .= " --local";
+  }
+  exec($cmd)
 }
 
 sub channel_player {
-  my $channel = shift;
+  my ($channel, $file_queue) = @_;
   my $player_pid = fork();
   if (!$player_pid) {
-    exec_channel_player($channel);
+    exec_channel_player($channel, $file_queue);
     exit;
   }
   $player_pid
@@ -338,6 +382,10 @@ sub channel_password_file {
 sub flag_idle {
   my $TV = shift;
   $TV->title("[waiting]");
+}
+
+sub automatic_channels_supported {
+  !$opt{local} && !$opt{auto_channel} && !$opt{simple} && !$opt{single_game};
 }
 
 sub request_tv {
@@ -375,6 +423,8 @@ sub request_tv {
       $TV->write("Waiting for requests (use !tv on $REQUEST_IRC_CHANNEL to request a game).");
       $TV->write("\r\n\r\n");
     }
+
+    $TV_IS_IDLE = !@queued_fetch && !@queued_playback;
 
     my $slept = 0;
     my $last_msg = 0;

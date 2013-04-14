@@ -18,9 +18,30 @@ sub create_channel_directory {
   }
 }
 
-sub channel_def_file {
+sub purge_request_files {
+  return unless -d $CHANNEL_DEF_DIR;
+  for my $file (glob("$CHANNEL_DEF_DIR/*.req")) {
+    unlink $file;
+  }
+}
+
+sub valid_channel_name {
   my $channel = shift;
-  File::Spec->catfile($CHANNEL_DEF_DIR, "$channel.def")
+  $channel =~ /^[^\s\/\\]+$/
+}
+
+sub channel_file {
+  my ($channel, $suffix) = @_;
+  die "Bad channel name: $channel" unless valid_channel_name($channel);
+  File::Spec->catfile($CHANNEL_DEF_DIR, $channel . $suffix)
+}
+
+sub channel_def_file {
+  channel_file(shift(), ".def")
+}
+
+sub channel_req_file {
+  channel_file(shift(), ".req")
 }
 
 sub channel_def {
@@ -48,12 +69,17 @@ sub channel_def {
 
 sub channel_exists {
   my $channel = shift;
-  -f channel_def_file($channel)
+  -f channel_def_file($channel) || -f channel_req_file($channel)
 }
 
 sub password_file {
+  channel_file(shift(), ".pwd")
+}
+
+sub delete_password_file {
   my $channel = shift;
-  File::Spec->catfile($CHANNEL_DEF_DIR, "$channel.pwd")
+  my $password_file = password_file($channel);
+  unlink($password_file) if -f $password_file;
 }
 
 sub generate_password_file {

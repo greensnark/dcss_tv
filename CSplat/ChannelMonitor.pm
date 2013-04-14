@@ -62,7 +62,7 @@ sub delete_channel {
 
 sub valid_channel_name {
   my ($self, $channel) = @_;
-  $channel =~ /^[^\s\/\\]+$/
+  CSplat::Channel::valid_channel_name($channel)
 }
 
 sub launch_channel {

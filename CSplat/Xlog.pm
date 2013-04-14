@@ -39,7 +39,7 @@ sub xlog_str {
     delete $hash{ttyrecs};
     delete $hash{ttyrecurls};
   }
-  join(":", map { "$_=@{[ escape_xlogfield($hash{$_}) ]}" } keys(%hash))
+  join(":", map { "$_=@{[ escape_xlogfield($hash{$_}) ]}" } sort(keys(%hash)))
 }
 
 sub xlog_merge {
@@ -50,6 +50,11 @@ sub xlog_merge {
     }
   }
   $first
+}
+
+sub game_channel_name {
+  my $g = shift;
+  $g->{name} . ':' . $g->{char} . '@' . $g->{xl} . '.T' . $g->{turn}
 }
 
 sub desc_game {
