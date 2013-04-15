@@ -39,17 +39,17 @@ END {
   kill HUP => -$$;
 }
 
+local $| = 1;
+
 # Fetch mode by default.
 GetOptions(\%opt, 'local', 'local-request',
            'simple', 'auto_channel=s', 'file_queue=s') or die;
-
 
 my $CHANMAN;
 unless ($opt{auto_channel}) {
   $CHANMAN = CSplat::FileChannelManager->new(\&channel_player);
 }
-
-local $SIG{CHLD} = $CHANMAN->reaper() if $CHANMAN;
+local $SIG{CHLD} = $CHANMAN ? $CHANMAN->reaper() : 'IGNORE';
 
 # An appropriately Crawlish number.
 my $PLAYLIST_SIZE = 9;
@@ -65,8 +65,6 @@ my $file_queue = $opt{'file_queue'};
 
 
 $REQUEST_HOST = 'localhost' if $opt{'local-request'};
-
-local $SIG{CHLD} = 'IGNORE';
 
 sub get_game_matching {
   my $g = shift;
@@ -167,7 +165,7 @@ sub canonicalize_game {
 }
 
 sub next_request {
-  my $REQ = shift;
+  my ($REQ) = @_;
   my $g;
 
   $g = canonicalize_game($REQ->next_request());
@@ -176,7 +174,6 @@ sub next_request {
     if ($file_queue && $TV_IS_IDLE) {
       print "Playlist empty and TV idle, exiting\n";
       $REQ->delete_file_queue();
-      CSplat::Channel::delete_password_file($TERMCAST_CHANNEL);
       exit;
     }
     return;
@@ -184,7 +181,7 @@ sub next_request {
 
   $g->{cancel} = 'y' if ($g->{nuke} || '') eq 'y';
 
-  if (defined($g->{channel}) && !$file_queue) {
+  if (defined($g->{channel}) && !$file_queue && $CHANMAN) {
     eval {
       $CHANMAN->game_request($g);
     };
@@ -291,7 +288,6 @@ sub cancel_playing_games {
     }
 
     my @filters = map(CSplat::Select::make_filter(xlog_hash($_)), @stop);
-
     if (grep(CSplat::Select::filter_matches($_, $g), @filters)) {
       return 'stop';
     }

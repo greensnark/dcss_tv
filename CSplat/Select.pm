@@ -8,6 +8,7 @@ use CSplat::Xlog;
 
 sub field_mangle {
   my ($field, $v) = @_;
+  $v ||= 0 if $field eq 'turn';
   return $v unless defined $v;
   if ($field eq 'start' || $field eq 'end') {
     $v =~ s/[SD]$//;
@@ -39,8 +40,9 @@ sub make_filter {
 sub filter_matches {
   my ($filter, $g) = @_;
   for my $key (keys %$filter) {
-    return if field_mangle($key, $$filter{$key}) ne
-       field_mangle($key, ($$g{$key} || ''));
+    my $filter_key = field_mangle($key, $$filter{$key});
+    my $game_key = field_mangle($key, ($$g{$key} || ''));
+    return if $filter_key ne $game_key;
   }
   1
 }

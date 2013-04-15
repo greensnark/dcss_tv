@@ -8,11 +8,14 @@ use POSIX ":sys_wait_h";
 use Fcntl qw/LOCK_EX SEEK_END/;
 use CSplat::Channel;
 use CSplat::Xlog;
+use threads::shared;
+
+my %CHANNEL_MAP :shared;
 
 sub new {
   my ($cls, $channel_launcher) = @_;
   purge_request_files();
-  bless { channel_launcher => $channel_launcher, channel_map => { } }, $cls
+  bless { channel_launcher => $channel_launcher }, $cls
 }
 
 sub purge_request_files {
@@ -42,23 +45,24 @@ sub game_request {
 
 sub spawn_channel {
   my ($self, $channel) = @_;
-  unless ($self->{channel_map}{$channel}) {
+  unless ($CHANNEL_MAP{$channel}) {
     print "Launching new FooTV process for channel: $channel\n";
     my $pid = $self->{channel_launcher}(
       $channel,
       CSplat::Channel::channel_req_file($channel));
-    $self->{channel_map}{$channel} = $pid;
+    print "Mapping channel $channel to $pid\n";
+    $CHANNEL_MAP{$channel} = $pid;
   }
 }
 
 sub reap_child {
   my ($self, $pid) = @_;
+  print "Reap child: $pid\n";
   my %pid_map;
-  my $channel_map = $self->{channel_map};
-  @pid_map{values %$channel_map} = keys %$channel_map;
+  @pid_map{values %CHANNEL_MAP} = keys %CHANNEL_MAP;
   if (my $channel = $pid_map{$pid}) {
     print "Deleting one-off channel $channel for pid $pid\n";
-    delete $channel_map->{$channel};
+    delete $CHANNEL_MAP{$channel};
   }
 }
 
