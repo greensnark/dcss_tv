@@ -104,7 +104,7 @@ sub reconnect {
 
   my $response = <$SOCK>;
   unless ($response and $response =~ /^hello, $self->{name}\s*$/) {
-    warn "Bad response from server: $response ($!)\n";
+    die "Bad response from server: $response ($!)\n";
     undef $SOCK;
   }
   else {
