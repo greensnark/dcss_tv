@@ -17,6 +17,41 @@ use Carp;
 use Fcntl qw/SEEK_SET/;
 use Data::Dumper;
 
+my %COLOR_NUMBER = (
+  black => 0,
+  red => 1,
+  green => 2,
+  yellow => 3,
+  blue => 4,
+  magenta => 5,
+  cyan => 6,
+  white => 7
+);
+
+my %COLOR_CODE_MAP = (
+  reset => '0',
+  normal => '0',
+  bold => '1',
+  faint => '2',
+  dim => '2',
+  italic => '3',
+  underline => '4',
+  slow_blink => '5',
+  blink => '5',
+  fast_blink => '6',
+  reverse => '7',
+  inverse => '7',
+  plain => '22',
+  black => 30,
+  red => 31,
+  green => 32,
+  yellow => 33,
+  blue => 34,
+  magenta => 35,
+  cyan => 36,
+  white => 37
+);
+
 my $TERMCAST_HOST = $ENV{TERMCAST_HOST} || 'termcast.develz.org';
 
 sub read_password {
@@ -119,6 +154,53 @@ sub title {
   $self->write("\e]2;" . $self->{title} . "\007")
 }
 
+sub color_number {
+  my ($self, $color, $offset) = @_;
+  if ($COLOR_NUMBER{$color}) {
+    ($offset || 30) + $COLOR_NUMBER{$color}
+  } else {
+    $color
+  }
+}
+
+sub color_code {
+  my ($self, $code) = @_;
+  if ($code =~ /^([fb]g):(.*)/) {
+    my ($which, $color) = ($1, $2);
+    $self->color_number($color, $which eq 'fg' ? 30 : 40);
+  }
+  $COLOR_CODE_MAP{$code} || $code
+}
+
+sub color_codes {
+  my ($self, @codes) = @_;
+  map($self->color_code($_), @codes)
+}
+
+sub clear_to_eol {
+  my $self = shift;
+  $self->write("\e[K");
+  $self
+}
+
+sub at {
+  my ($self, $line, $column) = @_;
+  $column ||= 1;
+  $line ||= 1;
+  $self->write("\e[$line;${column}H");
+  $self
+}
+
+sub color {
+  my ($self, @codes) = @_;
+  if (@codes) {
+    $self->write("\e[" . join(";", $self->color_codes(@codes)) . "m")
+  } else {
+    $self->write("\e[0m");
+  }
+  $self
+}
+
 sub write {
   my $self = shift;
 
@@ -137,6 +219,8 @@ sub write {
     delete $self->{SOCK};
     $self->write(@_);
   }
+
+  $self
 }
 
 sub disconnect {

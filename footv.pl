@@ -4,7 +4,6 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use CSplat::DB qw/open_db/;
 use CSplat::Xlog qw/desc_game desc_game_brief game_title xlog_hash xlog_str/;
 use CSplat::Ttyrec qw/request_download/;
 use CSplat::Select;
@@ -30,6 +29,7 @@ my @queued_fetch : shared;
 my @queued_playback : shared;
 my @stop_list : shared;
 my $TV_IS_IDLE :shared;
+my $MAX_IDLE_SECONDS = 90;
 
 my @recently_played;
 my $DUPE_SUPPRESSION_THRESHOLD = 9;
@@ -224,7 +224,6 @@ sub terminate_auto_footv {
 }
 
 sub check_requests {
-  open_db();
   if ($opt{auto_channel} && !$file_queue && !$opt{simple}) {
     queue_games_automatically();
   }
@@ -384,6 +383,10 @@ sub automatic_channels_supported {
   !$opt{local} && !$opt{auto_channel} && !$opt{simple} && !$opt{single_game};
 }
 
+sub tv_currently_idle {
+  !@queued_fetch && !@queued_playback
+}
+
 sub request_tv {
   print("Connecting to TV: name: $TERMCAST_CHANNEL, passfile: ", channel_password_file(), "\n");
   my $TV = CSplat::Termcast->new(name => $TERMCAST_CHANNEL,
@@ -391,8 +394,6 @@ sub request_tv {
                                  local => $opt{local});
 
   my $last_game;
-
-  open_db();
 
   if (!$opt{local} && !$opt{auto_channel} && !$opt{simple}) {
     start_channel_monitor();
@@ -404,33 +405,46 @@ sub request_tv {
   $TV->callback(\&cancel_playing_games);
   $TV->clear();
 
+  my $idle_begin;
+
  RELOOP:
   while (1) {
     flag_idle($TV);
     if ($last_game) {
       $TV->clear();
-      $TV->write("\e[1H");
-      $TV->write("\e[1;37mThat was:\e[0m\r\n\e[1;33m");
-      $TV->write(desc_game_brief($last_game));
-      $TV->write("\e[0m\r\n\r\n");
+      $TV->at(1);
+      $TV->color(qw/white/)->write("That was:");
+      $TV->write("\r\n");
+      $TV->color(qw/bold yellow/)->write(desc_game_brief($last_game));
+      $TV->color()->write("\r\n\r\n");
     }
 
     unless ($opt{auto_channel}) {
-      $TV->write("Waiting for requests (use !tv on $REQUEST_IRC_CHANNEL to request a game).");
+      $TV->write("Waiting for requests (see ??FooTV on $REQUEST_IRC_CHANNEL to request a game).");
       $TV->write("\r\n\r\n");
     }
-
-    $TV_IS_IDLE = !@queued_fetch && !@queued_playback;
 
     my $slept = 0;
     my $last_msg = 0;
     my $countup;
+    my $idle_warning_shown;
     while (1) {
+      my $idle_now = tv_currently_idle();
+      $idle_begin = time() if $idle_now && !defined($idle_begin);
+      $TV_IS_IDLE = $idle_now && $idle_begin &&
+                    (time() - $idle_begin) > $MAX_IDLE_SECONDS;
+
       while (@queued_fetch) {
+        $TV->clear() if $idle_warning_shown;
+        undef $idle_begin;
+        undef $idle_warning_shown;
         update_status($TV, shift(@queued_fetch), \$last_msg, $slept, \$countup);
       }
 
       if (@queued_playback) {
+        $TV->clear() if $idle_warning_shown;
+        undef $idle_begin;
+        undef $idle_warning_shown;
         my @copy = map(xlog_hash($_), @queued_playback);
         tv_show_playlist($TV, \@copy, $last_game);
         sleep 4 if $slept == 0;
@@ -439,6 +453,19 @@ sub request_tv {
 
       ++$slept if $countup;
       next RELOOP if $last_msg && $slept - $last_msg > 20;
+
+      if (!$last_msg && $idle_now && $idle_begin && $file_queue) {
+        my $idle_for = time() - $idle_begin;
+        my $will_exit = $MAX_IDLE_SECONDS - $idle_for;
+        if ($idle_for > 7) {
+          $will_exit = $will_exit <= 0 ? 'now' : "in ${will_exit}s";
+          $TV->at(23)->color(qw/dim white/);
+          $TV->write("Channel is idle, will exit $will_exit");
+          $TV->clear_to_eol();
+          $idle_warning_shown = 1;
+        }
+      }
+
       sleep 1;
     }
 

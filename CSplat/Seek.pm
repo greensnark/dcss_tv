@@ -7,7 +7,6 @@ use lib '..';
 
 our @EXPORT_OK = qw/tty_frame_offset clear_screen set_buildup_size/;
 
-use CSplat::DB qw/tty_precalculated_frame_offset tty_save_frame_offset/;
 use CSplat::Ttyrec qw/ttyrec_path ttyrec_file_time
                       $TTYRDEFSZ $TTYRMINSZ tv_frame_strip/;
 use CSplat::Xlog qw/desc_game_brief/;
@@ -104,10 +103,50 @@ sub tty_frame_offset {
   $play_range
 }
 
+
+sub cap_game_seek {
+  my ($v, $min, $max) = @_;
+  $v = $min if $v < $min && $v != -100;
+  $v = $max if $v > $max;
+  $v
+}
+
+sub _safenum {
+  my ($s, $defval) = @_;
+
+  $defval ||= 1;
+
+  $s = '' unless defined $s;
+  return -100 if $s eq '$';
+  return 0 if $s eq '0';
+
+  s/^\s+//, s/\s+$// for $s;
+
+  if ($s =~ /^[+-]?\d+(?:\.\d+)?$/) {
+    $s
+  }
+  else {
+    $defval
+  }
+}
+
+sub game_seek_multipliers {
+  my $g = shift;
+
+  my $preseek = _safenum($g->{seekbefore});
+  my $postseek = _safenum($g->{seekafter}, 0.5);
+  $postseek = 0.5 unless $g->{milestone};
+
+  $preseek = cap_game_seek($preseek, -20, 20);
+  $postseek = cap_game_seek($postseek, -20, 20);
+
+  ($preseek, $postseek)
+}
+
 sub tty_calc_frame_offset {
   my ($g, $deep) = @_;
 
-  my ($seekbefore, $seekafter) = CSplat::DB::game_seek_multipliers($g);
+  my ($seekbefore, $seekafter) = game_seek_multipliers($g);
   print "Seeking (<$seekbefore, >$seekafter) for start frame for ",
     CSplat::Xlog::desc_game($g), "\n";
 

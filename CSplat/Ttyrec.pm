@@ -21,7 +21,6 @@ use CSplat::Config;
 use CSplat::Notify;
 use CSplat::Xlog qw/fix_crawl_time game_unique_key desc_game xlog_str
                     xlog_hash xlog_merge/;
-use CSplat::DB qw/fetch_all_games exec_query in_transaction last_row_id/;
 use CSplat::Fetch qw/fetch_url/;
 use CSplat::TtyTime qw/tty_time/;
 use CSplat::TtyrecList;
