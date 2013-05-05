@@ -86,7 +86,7 @@ sources:
     timestamps:
       - http://crawl.develz.org/morgues/trunk
       - http://crawl.develz.org/morgues/0.9
-      - http://crawl.develz.org/morgues/$cv2$/$name$
+      - http://crawl.develz.org/morgues/$file_cv$/$name$
     ttyrecs:
       - http://termcast.develz.org/ttyrecs
       - ttyrec: http://crawl.develz.org/ttyrecs
