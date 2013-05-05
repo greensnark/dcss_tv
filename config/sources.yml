@@ -70,6 +70,7 @@ sources:
       - allgames{,-spr,-zd}-0.8.txt*
       - allgames{,-spr,-zd}-0.10.txt*
       - allgames{,-spr,-zd}-0.11.txt*
+      - allgames{,-spr,-zd}-0.12.txt*
       - allgames{,-spr,-zd}-svn.txt*
     milestones:
       - milestones-0.3.txt
@@ -80,11 +81,12 @@ sources:
       - milestones{,-spr,-zd}-0.8.txt*
       - milestones{,-spr,-zd}-0.10.txt*
       - milestones{,-spr,-zd}-0.11.txt*
+      - milestones{,-spr,-zd}-0.12.txt*
       - milestones{,-spr,-zd}-svn.txt*
     timestamps:
       - http://crawl.develz.org/morgues/trunk
       - http://crawl.develz.org/morgues/0.9
-      - http://crawl.develz.org/morgues/$cv$/$name$
+      - http://crawl.develz.org/morgues/$cv2$/$name$
     ttyrecs:
       - http://termcast.develz.org/ttyrecs
       - ttyrec: http://crawl.develz.org/ttyrecs
