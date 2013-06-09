@@ -139,3 +139,10 @@ sources:
       - http://light.bitprayer.com/userdata/$name$/ttyrec
     timestamps:
       - http://light.bitprayer.com/userdata/$name$/morgue
+
+  - name: clan
+    base: http://crawl.lantea.net/crawl
+    timestamps:
+      - http://crawl.lantea.net/crawl/morgue
+    ttyrecs:
+      - http://crawl.lantea.net/crawl/ttyrec
