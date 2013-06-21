@@ -119,7 +119,7 @@ sources:
       - http://crawlus.somatika.net/dumps
 
   - name: rhf
-    local-only: true
+    base: http://rl.heh.fi/
     logfiles:
       - remote.rhf-logfile-0.5
       - remote.rhf-logfile-0.6
@@ -132,6 +132,11 @@ sources:
       - remote.rhf-milestones-0.7
       - remote.rhf-milestones-spr
       - remote.rhf-milestones-trunk
+    timestamps:
+      - http://rl.heh.fi/morgue
+    ttyrecs:
+      - http://rl.heh.fi/ttyrec
+
 
   - name: lbc
     base: http://light.bitprayer.com
