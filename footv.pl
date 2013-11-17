@@ -233,11 +233,11 @@ sub check_requests {
 }
 
 sub channel_game_title {
-  my $g = shift;
-  if ($$g{req} ne $TERMCAST_CHANNEL && $$g{req} ne 'Henzell') {
-    $$g{extra} = join(",", $$g{extra} || '', 'req');
+  my %g = %{shift()};
+  if ($g{req} ne $TERMCAST_CHANNEL && $g{req} ne 'Henzell') {
+    $g{extra} = join(",", $g{extra} || '', 'req');
   }
-  game_title($g)
+  game_title(\%g)
 }
 
 sub tv_show_playlist {
