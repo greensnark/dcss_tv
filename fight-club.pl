@@ -91,17 +91,6 @@ sub clean_response {
   length($text) > 400? substr($text, 0, 400) : $text
 }
 
-sub log_irc {
-  my ($m, $line) = @_;
-
-  my $log = ${$LOGCHANNEL{$$m{channel}}}[1];
-  if ($log) {
-    chomp $line;
-    print $log "[" . scalar(gmtime()) . "] $line\n";
-    $log->flush;
-  }
-}
-
 sub process_msg {
   my ($m) = @_;
   my $nick = $$m{who};
@@ -135,33 +124,10 @@ sub connected {
   return undef;
 }
 
-sub emoted {
-  my ($self, $e) = @_;
-  main::log_irc($e, "* $$e{who} $$e{body}");
-  return undef;
-}
-
 sub said {
   my ($self, $m) = @_;
-  main::log_irc($m, "$$m{who}: $$m{body}");
   main::process_msg($m);
   return undef;
 }
 
-sub chanjoin {
-  my ($self, $j) = @_;
-  main::log_irc($j, "-|- $$j{who} has joined $$j{channel}");
-  return undef;
-}
-
-sub userquit {
-  my ($self, $q) = @_;
-  main::log_irc($q, "-|- $$q{who} has quit [$$q{body}]");
-  return undef;
-}
-
-sub chanpart {
-  my ($self, $m) = @_;
-  main::log_irc($m, "-|- $$m{who} has left $$m{channel}");
-  return undef;
-}
+1
