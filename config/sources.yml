@@ -165,3 +165,10 @@ sources:
       - http://kr.dobrazupa.org/ttyrecs
     timestamps:
       - http://kr.dobrazupa.org/morgue/0.13
+
+  - name: cbro
+    base: http://crawl.berotato.org/crawl
+    timestamps:
+      - http://crawl.berotato.org/crawl/morgue
+    ttyrecs:
+      - http://crawl.berotato.org/crawl/ttyrec
