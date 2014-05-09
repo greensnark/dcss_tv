@@ -52,7 +52,7 @@ sources:
       - http://crawl.akrasiac.org/rawdata
 
     ttyrecs:
-      - http://termcast.develz.org/cao/ttyrecs
+      - http://termcast.develz.org/ttyrecs/crawl.akrasiac.org/ttyrec
       - http://crawl.akrasiac.org/rawdata
 
   - name: cdo
@@ -88,7 +88,7 @@ sources:
       - http://crawl.develz.org/morgues/0.9
       - http://crawl.develz.org/morgues/$file_cv$/$name$
     ttyrecs:
-      - http://termcast.develz.org/ttyrecs
+      - http://termcast.develz.org/ttyrecs/crawl.develz.org/ttyrec
       - ttyrec: http://crawl.develz.org/ttyrecs
         listing: http://crawl.develz.org/cgi-bin/ttyrecs?$name$
 
