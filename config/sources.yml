@@ -105,6 +105,7 @@ sources:
     timestamps:
       - http://dobrazupa.org/morgue
     ttyrecs:
+      - http://termcast.develz.org/ttyrecs/dobrazupa.org/ttyrec
       - http://dobrazupa.org/ttyrec
 
   - name: csn
