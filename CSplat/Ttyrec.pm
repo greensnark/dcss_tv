@@ -365,7 +365,7 @@ sub ttyrec_file_time {
 sub ttyrec_between {
   my ($tty, $start, $end) = @_;
   my $pdate = ttyrec_file_time( $tty );
-  ($pdate le $end) && (!$start || $pdate ge $start)
+  ($pdate lt $end) && (!$start || $pdate ge $start)
 }
 
 sub ttyrec_directory {
