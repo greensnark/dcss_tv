@@ -3,6 +3,8 @@ package CSplat::TtyrecListParser;
 use strict;
 use warnings;
 
+use URI::Escape qw//;
+
 my %PARSE_EXPRESSIONS = (
   'crawl.develz.org' =>
        qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["'].*?
@@ -44,7 +46,7 @@ sub human_readable_size {
 
 sub ttyrec_url_timestring {
   my $url = shift;
-  return $1 if $url =~ /(\d{4}-\d{2}.*)/;
+  return URI::Escape::unescape($1) if $url =~ /(\d{4}-\d{2}.*)/;
   return $url;
 }
 
