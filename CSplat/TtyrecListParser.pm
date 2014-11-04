@@ -2,6 +2,7 @@ package CSplat::TtyrecListParser;
 
 use strict;
 use warnings;
+use Data::Dumper;
 
 use URI::Escape qw//;
 
@@ -10,7 +11,7 @@ my %PARSE_EXPRESSIONS = (
        qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["'].*?
           (\d+(?:\.\d+)?[kMB]|\s\d+)\s*$}xim,
                          ,
-  'default' => qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["'].*?>\s*(\d+(?:\.\d+)?[kMB]|\d+)\s*<}is
+  'default' => qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["']}is
 );
 
 sub new {
@@ -46,7 +47,7 @@ sub human_readable_size {
 
 sub ttyrec_url_timestring {
   my $url = shift;
-  return URI::Escape::unescape($1) if $url =~ /(\d{4}-\d{2}.*)/;
+  return URI::Escape::uri_unescape($1) if $url =~ /(\d{4}-\d{2}.*)/;
   return $url;
 }
 
@@ -58,14 +59,10 @@ sub parse {
   print("Parsing listing from $hostname using $listing_parse_expression\n");
   my (@urlsizes) = $listing =~ /$listing_parse_expression/g;
   my @urls;
-  for (my $i = 0; $i < @urlsizes; $i += 2) {
+  for (my $i = 0; $i < @urlsizes; ++$i) {
     my $url = $urlsizes[$i];
-    my $rawsize = $urlsizes[$i + 1];
-    my $size = human_readable_size($rawsize);
     push @urls, { u => $url,
-                  timestr => ttyrec_url_timestring($url),
-                  sz => $size,
-                  rawsize => $rawsize};
+                  timestr => ttyrec_url_timestring($url) };
   }
   grep($_->{u} =~ /\.ttyrec/, @urls)
 }

@@ -34,6 +34,7 @@ use File::Spec;
 use IO::Socket::INET;
 use Term::TtyRec::Plus;
 use Tie::Cache;
+use URI::Escape qw//;
 
 # Smallest cumulative length of ttyrec that's acceptable.
 our $TTYRMINSZ = 95 * 1024;
@@ -348,7 +349,7 @@ sub find_ttyrecs_for_game_player {
 }
 
 sub ttyrec_file_time {
-  my $url = shift;
+  my $url = URI::Escape::uri_unescape(shift);
   my ($date) = $url =~ /(\d{4}-\d{2}-\d{2}\.\d{2}:\d{2}:\d{2})/;
   if ($date) {
     $date =~ tr/./ /;
