@@ -35,6 +35,8 @@ use IO::Socket::INET;
 use Term::TtyRec::Plus;
 use Tie::Cache;
 use URI::Escape qw//;
+use Archive::Tar;
+use File::Basename qw//;
 
 # Smallest cumulative length of ttyrec that's acceptable.
 our $TTYRMINSZ = 95 * 1024;
@@ -112,6 +114,18 @@ sub fudge_size {
   $sz
 }
 
+sub untar {
+  my $tarfile = shift;
+  my $tar = Archive::Tar->new($tarfile) or return;
+  my $expected_ttyrec_name = File::Basename::basename($tarfile);
+  print STDERR "Looking for $expected_ttyrec_name in $tarfile\n";
+  my ($file) = grep(m{\Q${expected_ttyrec_name}\E$}, $tar->list_files());
+  if ($file) {
+    print STDERR "Extracting $file from $tarfile to $tarfile\n";
+    $tar->extract_file($file, $tarfile);
+  }
+}
+
 sub uncompress_ttyrec {
   my ($g, $url) = @_;
   my $ttyrec_path = ttyrec_path($g, $$url{u});
@@ -129,6 +143,8 @@ sub uncompress_ttyrec {
         and die "Couldn't gunzip $url->{u}\n";
       $url->{u} =~ s/\.gz$//;
     }
+    print STDERR "Attempting to unpack $uncompressed_path as tar\n";
+    untar($uncompressed_path);
   };
   if ($@) {
     unlink($ttyrec_path);

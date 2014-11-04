@@ -55,7 +55,7 @@ sub server_base {
 sub server_hostname {
   my $base = server_base(shift);
   return unless $base;
-  $base =~ qr{https?://([^/])+} && $1
+  $base =~ qr{https?://([^/]+)} && $1
 }
 
 sub game_server {
