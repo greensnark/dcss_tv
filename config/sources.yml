@@ -190,8 +190,17 @@ sources:
     logs:
       - '{trunk,0.14}/{logfile,milestones}{,-sprint,-zotdef}*'
       - '0.15/{logfile,milestones}*'
-    morgues:
+    timestamps:
       - [ 'lld.*-(0.\d+)', 'http://lazy-life.ddo.jp:8080/morgue-$1' ]
       - http://lazy-life.ddo.jp:8080/morgue
     ttyrecs:
       - http://lazy-life.ddo.jp/mirror/ttyrecs
+
+  - name: cpo
+    base: http://crawl.project357.org
+    logs:
+      - dcss-{milestones,logfiles}-{trunk,0.15}*
+    timestamps:
+      - http://crawl.project357.org/morgue
+    ttyrecs:
+      - http://crawl.project357.org/ttyrec
