@@ -72,7 +72,7 @@ sub have_cached_listing_for_game {
 
 sub clear_cached_urls_for_game {
   my $g = shift;
-  my $src = CSplat::Config::gamea_server_ttyrec_source($g);
+  my $src = CSplat::Config::game_server_ttyrec_source($g);
   $src->clear_cached_listing();
 }
 
