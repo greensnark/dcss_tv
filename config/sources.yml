@@ -52,7 +52,7 @@ sources:
       - http://crawl.akrasiac.org/rawdata
 
     ttyrecs:
-      - http://termcast.develz.org/ttyrecs/crawl.akrasiac.org/ttyrec
+      - https://termcast.shalott.org/ttyrecs/crawl.akrasiac.org/ttyrec
       - http://crawl.akrasiac.org/rawdata
 
   - name: cdo
@@ -88,7 +88,7 @@ sources:
       - http://crawl.develz.org/morgues/0.9
       - http://crawl.develz.org/morgues/$file_cv$/$name$
     ttyrecs:
-      - http://termcast.develz.org/ttyrecs/crawl.develz.org/ttyrec
+      - https://termcast.shalott.org/ttyrecs/crawl.develz.org/ttyrec
       - ttyrec: http://crawl.develz.org/ttyrecs
         listing: http://crawl.develz.org/cgi-bin/ttyrecs?$name$
 
@@ -105,7 +105,7 @@ sources:
     timestamps:
       - http://dobrazupa.org/morgue
     ttyrecs:
-      - http://termcast.develz.org/ttyrecs/dobrazupa.org/ttyrec
+      - https://termcast.shalott.org/ttyrecs/dobrazupa.org/ttyrec
       - http://dobrazupa.org/ttyrec
 
   - name: csn
@@ -172,6 +172,7 @@ sources:
     timestamps:
       - http://crawl.berotato.org/crawl/morgue
     ttyrecs:
+      - https://termcast.shalott.org/ttyrecs/crawl.berotato.org/ttyrec
       - http://crawl.berotato.org/crawl/ttyrec
 
   - name: cxc
