@@ -35,7 +35,6 @@ use IO::Socket::INET;
 use Term::TtyRec::Plus;
 use Tie::Cache;
 use URI::Escape qw//;
-use Archive::Tar;
 use File::Basename qw//;
 
 # Smallest cumulative length of ttyrec that's acceptable.
@@ -143,8 +142,6 @@ sub uncompress_ttyrec {
         and die "Couldn't gunzip $url->{u}\n";
       $url->{u} =~ s/\.gz$//;
     }
-    print STDERR "Attempting to unpack $uncompressed_path as tar\n";
-    untar($uncompressed_path);
   };
   if ($@) {
     unlink($ttyrec_path);
