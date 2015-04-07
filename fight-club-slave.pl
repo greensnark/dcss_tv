@@ -267,7 +267,7 @@ sub play_fight {
 
   unlink $ARENA_RESULT;
 
-  $pty->spawn("./crawl", "-arena", $what);
+  $pty->spawn("./crawl.build", "-arena", $what);
 
   my $fight_started_at = time;
   my $fight_too_long;

@@ -16,9 +16,9 @@ END {
 # 3) cancels blow the whole playlist.
 
 my $CRAWL_HOME = $ENV{CRAWL_HOME} or die "CRAWL_HOME must be set!\n";
-my $ARENA_REQ_FILE = 'arena.req';
+my $ARENA_REQ_FILE = 'fight-club.req';
 
-my $ARENA_IRC_PASSFILE = 'arenairc.pwd';
+my $ARENA_IRC_PASSFILE = 'fight-club-irc.pwd';
 
 my $IRCSERVER = 'irc.freenode.net';
 my $IRCNICK = 'varmin';
@@ -30,10 +30,6 @@ my @CHANNELS = ('##crawl', '##crawl-dev');
 our $IRC;
 our $LOGCRAWL;
 our $LOGCRAWLDEV;
-
-my %LOGCHANNEL = ('##crawl' => [ 'irc-crawl.log' ],
-                  '##crawl-dev' => [ 'irc-crawl-dev.log' ],
-                  'msg' => [ 'irc-msg.log' ]);
 
 local $SIG{CHLD} = sub { };
 
@@ -54,19 +50,13 @@ sub run_slave {
   # Parent does IRC, child does the pty.
   return if $pid;
 
-  my @args = ('./arena-slave.pl', '--req', $ARENA_REQ_FILE);
+  my @args = ('./fight-club-slave.pl', '--req', $ARENA_REQ_FILE);
   push @args, '--local' if $opt{local};
   exec(@args);
   exit 0;
 }
 
 sub do_irc {
-  for my $chan (keys %LOGCHANNEL) {
-    my $flog = $LOGCHANNEL{$chan};
-    open my $file, '>>', $$flog[0] or die "Can't open: $$flog[0]: $!\n";
-    push @$flog, $file;
-  }
-
   $IRC = Varmin->new(nick => $IRCNICK,
                      server => $IRCSERVER,
                      port => $IRCPORT,
