@@ -214,7 +214,6 @@ sub check_irc_requests {
 
   while (1) {
     next_request($REQ);
-    sleep 1;
   }
 }
 
