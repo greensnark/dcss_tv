@@ -145,7 +145,7 @@ sources:
     timestamps:
       - http://light.bitprayer.com/userdata/$name$/morgue
 
-  - name: clan
+  - name: cue
     base: http://underhound.eu:81/crawl
     timestamps:
       - http://underhound.eu:81/crawl/morgue
