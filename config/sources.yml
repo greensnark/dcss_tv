@@ -146,11 +146,11 @@ sources:
       - http://light.bitprayer.com/userdata/$name$/morgue
 
   - name: clan
-    base: http://crawl.lantea.net/crawl
+    base: http://underhound.eu:81/crawl
     timestamps:
-      - http://crawl.lantea.net/crawl/morgue
+      - http://underhound.eu:81/crawl/morgue
     ttyrecs:
-      - http://crawl.lantea.net/crawl/ttyrec
+      - http://underhound.eu:81/crawl/ttyrec
 
 
   - name: ckr
