@@ -49,6 +49,7 @@ our $TTYRDEFSZ = 130 * 1024;
 
 # Approximate compression of ttyrecs
 my $BZ2X = 11;
+my $XZ = 10;
 my $GZX = 6.6;
 
 my @FETCH_LISTENERS;
@@ -110,6 +111,7 @@ sub fudge_size {
   # Fudge size if the ttyrec is compressed.
   $sz *= $BZ2X if $url =~ /\.bz2$/;
   $sz *= $GZX if $url =~ /\.gz$/;
+  $sz *= $XZ if $url =~ /\.xz$/;
   $sz
 }
 
@@ -130,15 +132,20 @@ sub uncompress_ttyrec {
   my $ttyrec_path = ttyrec_path($g, $$url{u});
   eval {
     my $urlstr = $url->{u};
-    $urlstr =~ s/\.(?:bz2|gz)$//;
+    $urlstr =~ s/\.(?:bz2|gz|xz)$//;
     my $uncompressed_path = ttyrec_path($g, $urlstr);
-    if ($url->{u} =~ /.bz2$/) {
-      system("bunzip2 -k -f $ttyrec_path")
+    if ($url->{u} =~ /\.xz$/) {
+      system("xz --decompress --keep --force \Q$ttyrec_path")
+        and die "Couldn't xz --decompress $$url{u}\n";
+      $url->{u} =~ s/\.xz$//;
+    }
+    if ($url->{u} =~ /\.bz2$/) {
+      system("bunzip2 --keep --force \Q$ttyrec_path")
         and die "Couldn't bunzip $url->{u}\n";
       $url->{u} =~ s/\.bz2$//;
     }
-    if ($url->{u} =~ /.gz$/) {
-      system("gunzip -c $ttyrec_path >$uncompressed_path")
+    if ($url->{u} =~ /\.gz$/) {
+      system("gunzip -c \Q$ttyrec_path\E >\Q$uncompressed_path")
         and die "Couldn't gunzip $url->{u}\n";
       $url->{u} =~ s/\.gz$//;
     }

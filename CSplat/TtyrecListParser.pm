@@ -8,10 +8,10 @@ use URI::Escape qw//;
 
 my %PARSE_EXPRESSIONS = (
   'crawl.develz.org' =>
-       qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["'].*?
+       qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2|\.xz)?)["'].*?
           (\d+(?:\.\d+)?[kMB]|\s\d+)\s*$}xim,
                          ,
-  'default' => qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2)?)["']}is
+  'default' => qr{<\s*a\s+href\s*=\s*["']([^"']*?[.]ttyrec(?:\.gz|\.bz2|\.xz)?)["']}is
 );
 
 sub new {
