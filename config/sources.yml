@@ -204,3 +204,12 @@ sources:
       - http://crawl.project357.org/morgue
     ttyrecs:
       - http://crawl.project357.org/ttyrec
+
+  - name: cjr
+    base: https://crawl.jorgrun.rocks/meta
+    logs:
+      - '{0.17,0.18,git}/{milestones,logfile}{,-sprint,-zotdef}*'
+    morgues:
+      - https://crawl.jorgrun.rocks/morgue
+    ttyrecs:
+      - https://crawl.jorgrun.rocks/ttyrec
