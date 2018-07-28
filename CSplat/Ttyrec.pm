@@ -460,7 +460,7 @@ sub fetch_request {
       my $pid = fork;
       unless ($pid) {
         print "Starting fetch server\n";
-        exec "perl -MCarp=verbose fetch.pl";
+        exec "perl -I. -MCarp=verbose fetch.pl";
         exit 0;
       }
       # Give it a little time to get moving.

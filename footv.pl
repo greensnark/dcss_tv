@@ -332,7 +332,7 @@ sub exec_channel_player {
   my $logfile = "channels/logs/${channel}.log";
   CSplat::Util::open_logfile($logfile);
 
-  my $cmd = "perl $0 --auto_channel \Q$channel";
+  my $cmd = "perl -I. $0 --auto_channel \Q$channel";
   if ($file_queue) {
     $cmd .= " --file_queue \Q$file_queue";
   }

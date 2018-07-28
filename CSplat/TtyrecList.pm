@@ -4,7 +4,6 @@ use warnings;
 package CSplat::TtyrecList;
 
 use base 'Exporter';
-use LWP::Simple qw//;
 use IO::Socket::INET;
 use CSplat::Config;
 use CSplat::TtyrecListParser;
@@ -22,19 +21,30 @@ sub sort_ttyrecs {
   sort { $a->{timestr} cmp $b->{timestr} } @$ref
 }
 
+sub qualify_relative_url {
+    my ($base_url, $relative_url) = @_;
+    return $relative_url if $relative_url =~ m{^https?://};
+    $relative_url =~ s{^./}{};
+    $base_url = "$base_url/" unless $base_url =~ m{/$};
+    "$base_url$relative_url"
+}
+
 sub clean_ttyrec_url {
   my ($baseurl, $url) = @_;
-  $url->{u} =~ s{^./}{};
-  $baseurl = "$baseurl/" unless $baseurl =~ m{/$};
-  $url->{u} = $baseurl . $url->{u};
+  $url->{u} = qualify_relative_url($baseurl, $url->{u});
   $url
+}
+
+sub http_get_content {
+    my $url = shift;
+    qx/curl -s \Q$url/
 }
 
 sub http_fetch {
   my ($nick, $server_url) = @_;
   $server_url = "$server_url/" unless $server_url =~ m{/$};
   print "HTTP GET $server_url\n";
-  my $listing = LWP::Simple::get($server_url) or do {
+  my $listing = http_get_content($server_url) or do {
     print "Could not fetch listing from $server_url\n";
     return;
   };

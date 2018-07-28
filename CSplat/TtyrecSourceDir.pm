@@ -108,7 +108,8 @@ sub direct_list_ttyrecs {
   my ($self, $listener, $g, $listing_url) = @_;
 
   CSplat::Notify::notify($listener,
-                        "Fetching ttyrec listing from " . $listing_url . "...");
+                        "(direct) fetching ttyrec listing from " . $listing_url . "...");
+
   my $url_list = LWP::Simple::get($listing_url);
   my @urls = grep(/\.ttyrec/, split(/\n/, $url_list));
   my $ttyrec_base = $self->ttyrec_url();

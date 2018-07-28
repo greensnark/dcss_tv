@@ -52,7 +52,7 @@ my %COLOR_CODE_MAP = (
   white => 37
 );
 
-my $TERMCAST_HOST = $ENV{TERMCAST_HOST} || 'termcast.develz.org';
+my $TERMCAST_HOST = $ENV{TERMCAST_HOST} || 'localhost';
 
 sub read_password {
   my $pwfile = shift;
@@ -123,10 +123,9 @@ sub reconnect {
   my $self = shift;
   return if defined($self->{SOCK});
 
-  print "Attempting to connect...\n";
-
   my $server = $self->{host};
   my $port = $self->{port};
+  print STDERR "Connecting to termcast server: $server:$port\n";
   my $SOCK = IO::Socket::INET->new(PeerAddr => "$server:$port",
                                    Proto    => 'tcp',
                                    Type => SOCK_STREAM);

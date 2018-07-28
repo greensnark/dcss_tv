@@ -38,7 +38,7 @@ sub main {
 sub run_autovacuum {
   my $pid = fork;
   return if $pid;
-  exec("perl vacuum.pl");
+  exec("perl -I. vacuum.pl");
   exit 0;
 }
 
