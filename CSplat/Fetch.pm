@@ -23,7 +23,7 @@ sub fetch_url {
 
   my $rate_limit_flag = $rate_limit ? "--limit-rate=$rate_limit" : '';
 
-  my $command = "curl -s -C - $rate_limit_flag --output $file $url";
+  my $command = "wget -q -c $rate_limit_flag -O $file $url";
   print "$command\n";
 
   local $SIG{CHLD};
