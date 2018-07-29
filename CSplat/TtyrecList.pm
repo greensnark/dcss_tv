@@ -37,7 +37,7 @@ sub clean_ttyrec_url {
 
 sub http_get_content {
     my $url = shift;
-    qx/curl -s \Q$url/
+    qx/curl -L -s \Q$url/
 }
 
 sub http_fetch {
