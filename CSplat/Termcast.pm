@@ -270,7 +270,7 @@ sub play_ttyrec {
     if ($delay > 0) {
       select undef, undef, undef, $delay;
     }
-    $self->write(tv_frame_strip($fref->{data}));
+    $self->write($fref->{data});
     select undef, undef, undef, 1 if is_death_frame($fref->{data});
 
     if ($self->{_callbacks}) {
